@@ -1,0 +1,51 @@
+name: Learning Galaxy bot
+
+on:
+  schedule:
+    - cron: "22 1 * * *"    # every day 06:52 IST: news, path imports, digest
+    - cron: "17 13 * * 0"   # Sundays 18:47 IST: weekly report
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "What to run"
+        type: choice
+        options: [morning, weekly, both, book]
+        default: morning
+
+permissions:
+  contents: read
+
+concurrency:
+  group: learning-galaxy-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run bot
+        run: node bot/galaxy-bot.mjs
+        env:
+          TASK: ${{ github.event_name == 'workflow_dispatch' && inputs.task || (github.event.schedule == '17 13 * * 0' && 'weekly' || 'morning') }}
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+          LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'openai' }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+          APP_URL: ${{ vars.APP_URL }}
+          TIMEZONE: ${{ vars.TIMEZONE || 'Asia/Kolkata' }}
+          EXTRA_FEEDS: ${{ vars.EXTRA_FEEDS }}
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_PAGE_ID: ${{ vars.NOTION_PAGE_ID }}
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_REFRESH_TOKEN: ${{ secrets.GDRIVE_REFRESH_TOKEN }}
+          GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
