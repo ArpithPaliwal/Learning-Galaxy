@@ -316,6 +316,19 @@ select.tier{background:var(--panel);border:1px solid var(--line-2);border-radius
 .bdg .s{font-size:20px;color:var(--gold)}
 .bdg b{font-size:13.5px}
 .bdg span{font-size:12px;color:var(--fg-3)}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.vcard{display:flex;flex-direction:column;gap:3px;text-decoration:none;color:inherit;min-width:0;border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--panel-2)}
+.vcard:hover{border-color:var(--accent)}.vcard img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:var(--line)}
+.vcard .vt{font-size:12.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.vcard .vc{font-size:11.5px}
+details.libc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+details.libc>summary{list-style:none;cursor:pointer;padding:11px 14px;display:flex;flex-direction:column;gap:5px}
+details.libc>summary::-webkit-details-marker{display:none}
+details.libc[open]>summary{border-bottom:1px solid var(--line)}
+details.libc .libb{padding:12px 14px}
+details.libc .lt{font:500 15px/1.3 var(--f-display)}
+details.libc .ls{font-size:13px;color:var(--fg-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fab{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:70;width:54px;height:54px;border-radius:50%;border:0;background:var(--accent);color:#fff;font:400 30px/1 system-ui;box-shadow:0 8px 24px rgba(0,0,0,.45);cursor:pointer}
+.fab:hover{filter:brightness(1.1)}
 .kit{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-width:0}
 .kit h4{font:500 16px/1.3 var(--f-display)}
 .kit .src{font:12px var(--f-mono);color:var(--fg-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -439,6 +452,7 @@ body.display .dhud{display:block}
       <div class="grp"><span>Explore</span>
         <button data-view="today"><span class="ic">☀</span>Today</button>
         <button data-view="galaxy"><span class="ic">✺</span>Galaxy</button>
+        <button data-view="library"><span class="ic">▤</span>Library<b class="badge" id="libBadge" hidden style="background:var(--good)">0</b></button>
         <button data-view="inbox"><span class="ic">⇣</span>Inbox<b class="badge" id="inboxBadge" hidden style="background:var(--warn)">0</b></button>
         <button data-view="trending"><span class="ic">↗</span>Trending</button>
         <button data-view="research"><span class="ic">⌕</span>Research<b class="badge" id="researchBadge" hidden style="background:var(--accent)">0</b></button>
@@ -570,14 +584,26 @@ body.display .dhud{display:block}
         <div id="tkList" class="stack"></div>
       </section>
 
+      <!-- LIBRARY -->
+      <section id="v-library" class="view" hidden>
+        <div class="view-head"><div><div class="eyebrow">Library</div><h2>Everything you have saved to learn</h2><p>Every link you paste and every subject you type lands here with its summary, videos, step-by-step path and flashcards. It also appears in your galaxy, bucket, tasks and daily review.</p></div></div>
+        <div class="panel" style="margin-bottom:14px">
+          <div class="row" style="gap:8px;flex-wrap:nowrap"><input class="inp" id="lbAdd" placeholder="Paste a link, or type what you want to learn, e.g. Microsoft Agent Framework" style="flex:1;min-width:0"><button class="btn primary" id="lbGo">Add</button></div>
+          <div class="faint" style="font-size:12.5px;margin-top:6px" id="lbHint"></div>
+        </div>
+        <div class="grid-2" style="margin-bottom:14px"><div class="panel"><h3>This week <button class="btn small ghost" id="lbCopy" style="margin-left:auto">Copy digest</button></h3><div id="lbDigest" class="stack" style="gap:8px"></div></div><div class="panel"><h3>Learn next</h3><div id="lbNext" class="chips"></div></div></div>
+        <div class="row" style="margin-bottom:10px"><input class="inp" id="lbSearch" type="search" placeholder="Search your library" style="max-width:320px"><div class="chips" id="lbKinds"></div></div>
+        <div id="lbList" class="stack" style="gap:8px"></div>
+      </section>
+
       <!-- INBOX -->
       <section id="v-inbox" class="view" hidden>
-        <div class="view-head"><div><div class="eyebrow">Inbox</div><h2>Learn from any link</h2><p>Send a YouTube video, Instagram reel, arXiv paper, GitHub repo or article. You get a study kit: the subject, a summary, key points, topics added to your galaxy, flashcards, a step-by-step plan and resources.</p></div></div>
+        <div class="view-head"><div><div class="eyebrow">Inbox</div><h2>Learn from any link or subject</h2><p>Paste a link or type a subject. It builds by itself and lands in your Library, graph, bucket, tasks and review. You get a study kit: the subject, a summary, key points, topics added to your galaxy, flashcards, a step-by-step plan and resources.</p></div></div>
         <div class="panel" style="margin-bottom:16px">
-          <div class="field"><label for="ibUrl">Link</label><input class="inp" id="ibUrl" type="url" placeholder="https://www.youtube.com/watch?v=…  or an Instagram reel, arXiv, GitHub, article"></div>
+          <div class="field"><label for="ibUrl">Link, or just the name of what you want to learn</label><input class="inp" id="ibUrl" placeholder="Paste a YouTube / reel / arXiv / GitHub / article link, or type e.g. Microsoft Agent Framework"></div>
           <div class="field" style="margin-top:10px"><label for="ibNote">What caught your eye? (optional, helps a lot for reels)</label><input class="inp" id="ibNote" placeholder="e.g. explains KV cache, or the tool at 0:45"></div>
           <details style="margin-top:10px"><summary class="faint" style="cursor:pointer;font-size:13.5px">Paste the transcript, caption or text for instant, more accurate results</summary><textarea class="inp" id="ibText" style="margin-top:8px" placeholder="YouTube: … → Show transcript → copy. Instagram: copy the caption. Papers: paste the abstract."></textarea></details>
-          <div class="row" style="margin-top:12px"><button class="btn" id="ibAdd">Add to inbox</button><span class="ai-row" id="ibNowWrap"><button class="btn primary" id="ibNow">Add &amp; build study kit now</button><select class="tier" id="ibTier" aria-label="AI model tier"></select></span><span class="faint" style="font-size:12.5px" id="ibHint"></span></div>
+          <div class="row" style="margin-top:12px"><button class="btn primary" id="ibAdd">Add to library</button><span class="ai-row" id="ibNowWrap"><select class="tier" id="ibTier" aria-label="AI model tier"></select></span><span class="faint" style="font-size:12.5px" id="ibHint"></span></div>
         </div>
         <div class="chips" id="ibFilter" style="margin-bottom:12px"></div>
         <div id="ibList" class="stack"></div>
@@ -713,6 +739,7 @@ body.display .dhud{display:block}
               <div class="field" style="margin-top:10px"><label for="pGoals">What you're working towards (used in every AI prompt)</label><textarea class="inp" id="pGoals" placeholder="e.g. Interview-ready for product/AI companies; build my own mini-GPT and a voice agent"></textarea></div>
               <div class="row" style="margin-top:10px"><button class="btn small w" id="pSave">Save profile</button></div>
             </div>
+            <div class="panel" id="ytPanel"><h3>YouTube videos (optional)</h3><p class="faint" style="font-size:13px;margin:0 0 8px">With a free YouTube Data API v3 key, every subject or link also gets the real top videos on the Library page, not just search links. The key stays only in this browser. Make one in Google Cloud Console, restrict it to this site and the YouTube Data API.</p><div class="field"><label for="ytKey">YouTube Data API key</label><input class="inp" id="ytKey" type="password" autocomplete="off" placeholder="AIza…"></div></div>
             <div class="panel"><h3>AI engine</h3>
               <div class="field"><label for="aiProvider">Provider</label><select class="inp" id="aiProvider"></select></div>
               <p class="faint" id="aiNote" style="font-size:13px;margin:8px 0 0"></p>
@@ -988,11 +1015,12 @@ const catOf = x => C('categories').get(x?.cat) || {id:x?.cat, name:x?.cat||'Othe
 const mineOK = x => !S.onlyMine || x.source !== 'ai';
 const catOK = x => S.cat === 'all' || x.cat === S.cat;
 const isDue = t => t.status==='learned' && t.srs && t.srs.due && t.srs.due <= today();
+const revDue = t => (t.status==='learned' || t.kitReview) && t.srs && t.srs.due && t.srs.due <= today();
 const effStatus = t => isDue(t) ? 'due' : (STATUS[t.status] ? t.status : 'todo');
 const topics = ({ignoreCat=false}={}) => [...C('topics').values()].filter(t => mineOK(t) && (ignoreCat || catOK(t)));
 const probDue = p => p.status==='solved' && p.srs && p.srs.due && p.srs.due <= today();
 function reviewQueue(){
-  const t = topics().filter(x => isDue(x) || S.extraReview.has('t:'+x.id)).map(x => ({key:'t:'+x.id, type:'topic', item:x, due:x.srs?.due||''}));
+  const t = topics().filter(x => revDue(x) || S.extraReview.has('t:'+x.id)).map(x => ({key:'t:'+x.id, type:'topic', item:x, due:x.srs?.due||''}));
   const p = (S.cat==='all'||S.cat==='dsa') ? [...C('problems').values()].filter(x => mineOK(x) && (probDue(x) || S.extraReview.has('p:'+x.id))).map(x => ({key:'p:'+x.id, type:'problem', item:x, due:x.srs?.due||''})) : [];
   return [...t, ...p].sort((a,b)=>a.due.localeCompare(b.due));
 }
@@ -1099,14 +1127,14 @@ const controllers = new Set(); function abortAll(){ controllers.forEach(c => c.a
 function debounceSave(key, fn, ms=900){ let t; const run = () => { clearTimeout(t); pendingSavers.delete(run); fn(); }; return () => { clearTimeout(t); pendingSavers.add(run); t = setTimeout(run, ms); }; }
 
 /* ================= navigation & render scheduling ================= */
-const TITLES = {book:'My book', research:'Research', tasks:'Tasks', inbox:'Inbox', trending:'Trending', academy:'AI Academy', today:'Today', galaxy:'Galaxy', bucket:'Bucket', paths:'Paths', review:'Review', dsa:'DSA · Striver A2Z', forge:'Forge', practice:'Mock interviews', done:'Done wall', progress:'Progress', news:'News', powers:'All powers', settings:'Settings'};
+const TITLES = {book:'My book', research:'Research', tasks:'Tasks', library:'Library', inbox:'Inbox', trending:'Trending', academy:'AI Academy', today:'Today', galaxy:'Galaxy', bucket:'Bucket', paths:'Paths', review:'Review', dsa:'DSA · Striver A2Z', forge:'Forge', practice:'Mock interviews', done:'Done wall', progress:'Progress', news:'News', powers:'All powers', settings:'Settings'};
 function setView(v){
   if (!TITLES[v]) v = 'today'; S.view = v; LS.set('view', v);
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view===v));
   $$('.view').forEach(s => s.hidden = s.id !== 'v-'+v);
   $('#viewTitle').textContent = TITLES[v];
   $('#searchWrap').hidden = v!=='galaxy';
-  $('#filters').hidden = ['settings','powers','practice','inbox','trending','research','tasks','book'].includes(v);
+  $('#filters').hidden = ['settings','powers','practice','library','inbox','trending','research','tasks','book'].includes(v);
   document.body.classList.remove('rail-open'); $('#railScrim').hidden = true;
   if (v==='galaxy') setTimeout(() => window.__LG?.resizeGraph?.(), 30);
   render(); window.scrollTo({top:0});
@@ -2021,7 +2049,7 @@ renderers.push(function reviewView(){
   if (!cur || cur.key!==S.review.key) S.review = {key:cur?.key||null, i:0, revealed:false};
   const box = $('#flash');
   if (!cur) {
-    const next = [...topics().filter(x=>x.status==='learned' && x.srs?.due).map(x=>({t:x.title, d:x.srs.due})), ...[...C('problems').values()].filter(p=>p.status==='solved'&&p.srs?.due).map(p=>({t:p.title, d:p.srs.due}))].sort((a,b)=>a.d.localeCompare(b.d))[0];
+    const next = [...topics().filter(x=>(x.status==='learned'||x.kitReview) && x.srs?.due).map(x=>({t:x.title, d:x.srs.due})), ...[...C('problems').values()].filter(p=>p.status==='solved'&&p.srs?.due).map(p=>({t:p.title, d:p.srs.due}))].sort((a,b)=>a.d.localeCompare(b.d))[0];
     box.innerHTML = `<div class="flash"><div class="eyebrow">All clear</div><h3>Nothing to review today.</h3><p class="muted">${next ? `Next up: <b>${esc(next.t)}</b> ${esc(relDate(next.d))}.` : 'Mark a topic as learned or solve a problem and it comes back here.'}</p></div>`;
   } else {
     const x = cur.item, c = cur.type==='topic' ? catOf(x) : (C('categories').get('dsa') || {name:'DSA', color:'#d95926'}); const s = x.srs || {reps:0, interval:1};
@@ -2046,7 +2074,7 @@ renderers.push(function reviewView(){
     const mo = $('#rvMock'); if (mo) mo.onclick = () => startInterviewWith('dsa', x.title, 'p:'+x.id);
     $$('#flash .rate button').forEach(b => b.onclick = () => L.rateItem(cur, b.dataset.g));
   }
-  const up = [...topics().filter(x=>x.status==='learned' && x.srs?.due > today()).map(x=>({type:'topic', x, d:x.srs.due})), ...[...C('problems').values()].filter(p=>p.status==='solved' && p.srs?.due > today()).map(p=>({type:'problem', x:Object.assign({cat:'dsa'},p), d:p.srs.due}))].sort((a,b)=>a.d.localeCompare(b.d)).slice(0,12);
+  const up = [...topics().filter(x=>(x.status==='learned'||x.kitReview) && x.srs?.due > today()).map(x=>({type:'topic', x, d:x.srs.due})), ...[...C('problems').values()].filter(p=>p.status==='solved' && p.srs?.due > today()).map(p=>({type:'problem', x:Object.assign({cat:'dsa'},p), d:p.srs.due}))].sort((a,b)=>a.d.localeCompare(b.d)).slice(0,12);
   $('#upcoming').innerHTML = up.length ? up.map(u=>itemLi(u.type, u.x, relDate(u.d))).join('') : `<li class="empty" style="cursor:default">Nothing scheduled yet.</li>`;
 });
 function rateHtml(s){ const lab = d => d===1 ? '1 day' : d+' days'; const g = k => L.srsNext(s,k).interval;
@@ -2899,66 +2927,111 @@ Return 3-8 concrete gaps, most important first. Reply with only JSON: [{"title":
 };
 
 /* ---------------- INBOX: learn from any link ---------------- */
-const KIND_ICON = {youtube:'▶', instagram:'◎', paper:'¶', github:'⌥', article:'↗'};
-const KIND_NAME = {youtube:'YouTube', instagram:'Instagram', paper:'Paper', github:'GitHub', article:'Article'};
+const KIND_ICON = {youtube:'▶', instagram:'◎', paper:'¶', github:'⌥', article:'↗', subject:'✦'};
+const KIND_NAME = {youtube:'YouTube', instagram:'Instagram', paper:'Paper', github:'GitHub', article:'Article', subject:'Subject'};
 function detectKind(u){ const h = hostOf(u); if (/youtube\.com|youtu\.be/.test(h)) return 'youtube'; if (/instagram\.com/.test(h)) return 'instagram'; if (/arxiv\.org|openreview\.net|paperswithcode/.test(h)) return 'paper'; if (h==='github.com') return 'github'; return 'article'; }
 function firstUrl(s){ const m = String(s||'').match(/https?:\/\/[^\s<>"']+/); return m ? m[0].replace(/[).,]+$/,'') : ''; }
 L.detectKind = detectKind;
-async function addToInbox({url, note='', text='', now=false, tier='smart', title=''}){
-  url = safeUrl(url) || firstUrl(url); if (!url) { toast('Paste a link that starts with https://'); return null; }
-  const dup = [...C('inbox').values()].find(i => i.url===url); if (dup) { toast('Already in your inbox.'); return dup.id; }
-  const id = newId(KIND_NAME[detectKind(url)]+'-'+hostOf(url));
-  const doc = {url, kind:detectKind(url), note:String(note).slice(0,500), text:String(text).slice(0,20000), title:String(title).slice(0,200), status:'pending', added:today(), at:nowIso(), source:'me'};
+const YT_KEY = () => LS.get('ytkey', '');
+const building = new Set();
+async function addToInbox({url='', note='', text='', now, tier='smart', title='', quiet=false}){
+  const raw = String(url||'').trim(); const link = safeUrl(raw) || firstUrl(raw);
+  let id, doc;
+  if (link) {
+    const dup = [...C('inbox').values()].find(i => i.url===link); if (dup) { toast('Already in your library.'); return dup.id; }
+    id = newId(KIND_NAME[detectKind(link)]+'-'+hostOf(link));
+    doc = {url:link, kind:detectKind(link), note:String(note).slice(0,500), text:String(text).slice(0,20000), title:String(title).slice(0,200), status:'pending', added:today(), at:nowIso(), source:'me'};
+  } else {
+    const subj = (title || raw).replace(/\s+/g,' ').trim().slice(0,160);
+    if (subj.length < 2) { toast('Paste a link, or type what you want to learn.'); return null; }
+    const dup = [...C('inbox').values()].find(i => i.kind==='subject' && String(i.title).toLowerCase()===subj.toLowerCase()); if (dup) { toast('Already in your library.'); return dup.id; }
+    id = newId('subject '+subj);
+    doc = {url:'', kind:'subject', note:String(note).slice(0,500), text:String(text).slice(0,20000), title:subj, status:'pending', added:today(), at:nowIso(), source:'me'};
+  }
   await put('inbox', id, doc);
-  if (now && aiOK()) buildKit(Object.assign({id}, doc), tier); else toast(IN_CLAUDE ? 'Added. Claude builds the study kit on the next refresh.' : 'Added. Your bot builds the study kit on its next run.', 4500);
+  const auto = (now===undefined ? true : now) && aiOK();
+  if (auto) buildKit(Object.assign({id}, doc), tier);
+  else if (!quiet) toast(IN_CLAUDE ? 'Saved. Claude builds the study kit on the next refresh.' : 'Saved. It builds as soon as an AI provider is on, or on your bot\'s next run.', 4500);
   return id;
 }
 L.addToInbox = addToInbox;
 function kitPrompt(item){
   const cats = sortedCats().map(c=>`${c.id}: ${c.name}`).join(', ');
   const tops = [...C('topics').values()].map(t=>t.title).slice(0,250).join('; ');
-  return `Turn this ${KIND_NAME[item.kind]||'link'} into a study kit for the learner.
-Link: ${item.url}${item.title?`\nTitle: ${item.title}`:''}
+  const subj = item.kind==='subject';
+  const head = subj
+    ? `The learner wants to study this subject from scratch: "${item.title}".\nBuild a complete, step-by-step learning path for it. Use what you know up to your knowledge cutoff; for fast-moving tools say what to verify in the official docs.`
+    : `Turn this ${KIND_NAME[item.kind]||'link'} into a study kit for the learner.\nLink: ${item.url}${item.title?`\nTitle: ${item.title}`:''}`;
+  return `${head}
 Learner's note: ${item.note || '(none)'}
-Content text (transcript / caption / abstract / README; may be partial or empty):
+${subj ? '' : `Content text (transcript / caption / abstract / README; may be partial or empty):
 """${String(item.text||'').slice(0,16000) || '(not available: rely on the link, title and note; set confidence "low")'}"""
-Existing categories (id: name): ${cats}
+`}Existing categories (id: name): ${cats}
 Existing topic titles: ${tops}
 Reply with only JSON:
-{"subject":"what it teaches, as a short title","cat":"an existing category id, or a short new category name","level":"Beginner|Intermediate|Advanced","confidence":"high|low","summary":"3-6 sentence Markdown summary of what the content explains","key_points":[{"t":"timestamp like 03:12 or empty","text":"..."}],"main_topic":"the exact existing topic title if it is the same subject, else a new concise topic title","topics":[{"title":"related topic worth learning","why":"one sentence","parent":"exact existing topic title or null"}],"flashcards":[{"q":"...","a":"short answer"}],"exercise":"one hands-on task with a visible result","plan":[{"t":"step","minutes":20,"how":"one line"}],"resources":[{"label":"...","url":"official docs, GitHub or arXiv URL you are certain exists"}],"video_search":["YouTube search query for a deeper video"]}
-Rules: 4-6 key points, 2-5 related topics (not already existing), 4-6 flashcards, 3-6 plan steps where step 1 is to watch/read the original. If the content is not about learning anything, still summarise it and keep the plan to 1-2 steps.`;
+{"subject":"${subj?'the subject as a clean title':'what it teaches, as a short title'}","cat":"an existing category id, or a short new category name","level":"Beginner|Intermediate|Advanced","confidence":"high|low","summary":"3-6 sentence Markdown summary of ${subj?'what it is, why it matters and where it is used':'what the content explains'}","key_points":[{"t":"${subj?'':'timestamp like 03:12 or empty'}","text":"..."}],"main_topic":"the exact existing topic title if it is the same subject, else a new concise topic title","topics":[{"title":"sub-topic or prerequisite worth learning","why":"one sentence","parent":"exact existing topic title or null"}],"flashcards":[{"q":"...","a":"short answer"}],"exercise":"one hands-on task with a visible result","plan":[{"t":"step","minutes":20,"how":"one line","video_search":"YouTube search query for this step"}],"resources":[{"label":"...","url":"official docs, GitHub or arXiv URL you are certain exists"}],"video_search":["3-4 different YouTube search queries: overview, tutorial, deep dive, hands-on"],"learn_next":[{"title":"a follow-up subject to study after this","why":"one sentence"}]}
+Rules: 4-6 key points, ${subj?'5-8 sub-topics/prerequisites in learning order':'2-5 related topics (not already existing)'}, 5-8 flashcards, ${subj?'6-10 plan steps ordered from fundamentals to a small project (each with minutes and a video_search query)':'3-6 plan steps where step 1 is to watch/read the original'}, exactly 3 learn_next subjects that are not already existing topics. If the content is not about learning anything, still summarise it and keep the plan to 1-2 steps.`;
 }
 async function buildKit(item, tier='smart'){
   if (!aiOK()) { toast('Turn on an AI provider in Settings first.'); return; }
-  await patch('inbox', item.id, {status:'processing'});
+  if (building.has(item.id)) return; building.add(item.id);
+  await patch('inbox', item.id, {status:'processing', started:nowIso(), error:null});
   try { const kit = await AI.json(kitPrompt(item), {tier}); if (!kit || !kit.subject) throw {code:'invalid_json'}; await applyKit(item, kit, 'me'); }
   catch(e){ aiError(e); patch('inbox', item.id, {status: item.status==='done' ? 'done' : 'pending', error: e.code||'error'}); }
+  finally { building.delete(item.id); }
 }
+L.buildKit = buildKit;
+/* real YouTube results when a YouTube Data API key is saved (browser only) */
+async function ytFind(q, n=3){
+  const key = YT_KEY(); if (!key || IN_CLAUDE || !q) return [];
+  try { const ctl = new AbortController(); const tm = setTimeout(()=>ctl.abort(), 9000);
+    const r = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&safeSearch=moderate&maxResults='+n+'&q='+encodeURIComponent(q)+'&key='+encodeURIComponent(key), {signal:ctl.signal}); clearTimeout(tm);
+    if (!r.ok) return []; const j = await r.json();
+    return (j.items||[]).filter(v=>v.id?.videoId).map(v => ({id:v.id.videoId, title:String(v.snippet?.title||'').replace(/&amp;|&#39;|&quot;/g,m=>({'&amp;':'&','&#39;':"'",'&quot;':'"'}[m])).slice(0,140), channel:String(v.snippet?.channelTitle||'').slice(0,60), url:'https://www.youtube.com/watch?v='+v.id.videoId}));
+  } catch(e){ return []; }
+}
+L.ytFind = ytFind;
 async function applyKit(item, kit, by){
   let cat = String(kit.cat||'');
   if (!C('categories').has(cat)) { const byName = sortedCats().find(c => c.name.toLowerCase()===cat.toLowerCase()); cat = byName ? byName.id : (cat ? L.ensureCategory('__new', cat) : (sortedCats()[0]?.id || 'ai')); }
+  const subj = item.kind==='subject';
   const T = [...C('topics').values()]; const find = t => T.find(x => x.title.toLowerCase() === String(t||'').toLowerCase());
-  const orig = {label:`${KIND_NAME[item.kind]||'Source'}: ${String(kit.subject||item.url).slice(0,80)}`, url:item.url, by:'me'};
+  const orig = item.url ? {label:`${KIND_NAME[item.kind]||'Source'}: ${String(kit.subject||item.url).slice(0,80)}`, url:item.url, by:'me'} : null;
   const extra = L.cleanStep({links:kit.resources||[], video_search:kit.video_search||[]}, null, 'ai').links;
-  const cards = (kit.flashcards||[]).filter(c=>c && c.q && c.a).slice(0,6).map(c=>({q:String(c.q).slice(0,300), a:String(c.a).slice(0,500)}));
+  /* real videos (needs a YouTube API key); otherwise the YouTube search links above */
+  const queries = [...new Set([...(kit.video_search||[]), ...(kit.plan||[]).map(s=>s&&s.video_search)].map(q=>String(q||'').slice(0,120)).filter(Boolean))].slice(0,6);
+  const found = YT_KEY() ? await Promise.all(queries.map(q => ytFind(q, 3))) : [];
+  const videos = []; const seenV = new Set(); found.flat().forEach(v => { if (!seenV.has(v.id) && videos.length<10) { seenV.add(v.id); videos.push(v); } });
+  const vidLinks = videos.map(v => ({label:'▶ '+v.title+(v.channel?' · '+v.channel:''), url:v.url, by:'ai'}));
+  const cards = (kit.flashcards||[]).filter(c=>c && c.q && c.a).slice(0,8).map(c=>({q:String(c.q).slice(0,300), a:String(c.a).slice(0,500)}));
   const summary = String(kit.summary||'').slice(0,3000);
+  const tomorrow = () => Object.assign({}, fsrs.init(3), {due:addDays(today(),1), interval:1});
+  const res = [orig, ...extra, ...vidLinks].filter(Boolean);
   let mainId; const ex = find(kit.main_topic);
-  if (ex) { mainId = ex.id; const have = new Set((ex.resources||[]).map(r=>r.url)); patch('topics', ex.id, {resources:[...(ex.resources||[]), ...[orig, ...extra].filter(r=>!have.has(r.url)).map(r=>({label:r.label, url:r.url}))], cards:[...(ex.cards||[]), ...cards], ...(ex.explain ? {} : {explain:summary})}); }
-  else mainId = L.createTopic({title:String(kit.main_topic||kit.subject).slice(0,90), cat, status:'todo', source:'me', priority:2, notes:item.note||'', explain:summary, cards, why:`From a ${KIND_NAME[item.kind]||'link'} you sent`, resources:[orig, ...extra].map(r=>({label:r.label, url:r.url}))});
+  if (ex) { mainId = ex.id; const have = new Set((ex.resources||[]).map(r=>r.url)); const add = cards.length && !(ex.cards||[]).length;
+    patch('topics', ex.id, {resources:[...(ex.resources||[]), ...res.filter(r=>!have.has(r.url)).map(r=>({label:r.label, url:r.url}))], cards:[...(ex.cards||[]), ...cards], ...(ex.explain ? {} : {explain:summary}), ...(add && !ex.srs ? {kitReview:true, srs:tomorrow()} : {})}); }
+  else mainId = L.createTopic({title:String(kit.main_topic||kit.subject).slice(0,90), cat, status:'todo', source:'me', priority:2, notes:item.note||'', explain:summary, cards, why: subj ? 'You asked to learn this' : `From a ${KIND_NAME[item.kind]||'link'} you sent`, resources:res.map(r=>({label:r.label, url:r.url})), ...(cards.length ? {kitReview:true, srs:tomorrow()} : {})});
   const newTopics = [];
-  for (const r of (kit.topics||[]).slice(0,5)) { if (!r || !r.title || find(r.title)) continue; const p = find(r.parent);
-    newTopics.push(L.createTopic({title:String(r.title).slice(0,90), cat, status:'suggested', source:'ai', why:String(r.why||'').slice(0,220), parent: p ? p.id : mainId, priority:2})); }
+  for (const r of (kit.topics||[]).slice(0, subj?8:5)) { if (!r || !r.title || find(r.title)) continue; const p = find(r.parent);
+    newTopics.push(L.createTopic({title:String(r.title).slice(0,90), cat, status: subj ? 'todo' : 'suggested', source:'ai', why:String(r.why||'').slice(0,220), parent: p ? p.id : mainId, priority:2})); }
   const pathId = newId('kit '+kit.subject);
-  const steps = (kit.plan||[]).slice(0,8).map((s,i)=>({id:'s'+(i+1), t:String(s.t||'Step').slice(0,160), url: i===0 ? item.url : '', dur: s.minutes ? `${clamp(Number(s.minutes)||20,5,240)}:00` : '', sec:'', done:false, how:String(s.how||'').slice(0,200)}));
+  const plan = (kit.plan||[]).slice(0,10);
+  const steps = plan.map((s,i) => { const q = String(s.video_search||'').slice(0,120); const fv = q && videos.length ? (found[queries.indexOf(q)]||[])[0] : null;
+    return {id:'s'+(i+1), t:String(s.t||'Step').slice(0,160), url: (i===0 && item.url) ? item.url : (fv ? fv.url : ''), dur: s.minutes ? `${clamp(Number(s.minutes)||20,5,240)}:00` : '', sec:'', done:false, how:String(s.how||'').slice(0,200), search:q}; });
   if (kit.exercise) steps.push({id:'s'+(steps.length+1), t:'Exercise: '+String(kit.exercise).slice(0,150), url:'', dur:'', sec:'', done:false});
   const kp = (kit.key_points||[]).slice(0,8).map(k=>({t:String(k.t||'').slice(0,10), text:String(k.text||'').slice(0,300)}));
-  await put('paths', pathId, {title:'Study kit: '+String(kit.subject).slice(0,100), kind:'kit', cat, url:item.url, source:'me', steps, links:extra, notes:`${summary}\n\nKey points:\n${kp.map(k=>`- ${k.t?k.t+' ':''}${k.text}`).join('\n')}`, inbox:item.id, created:nowIso()});
+  const next = (kit.learn_next||[]).filter(n=>n&&n.title).slice(0,3).map(n=>({title:String(n.title).slice(0,100), why:String(n.why||'').slice(0,160)}));
+  await put('paths', pathId, {title:(subj?'Learning path: ':'Study kit: ')+String(kit.subject).slice(0,100), kind:'kit', cat, url:item.url||'', source:'me', steps, links:[...extra, ...vidLinks], notes:`${summary}\n\nKey points:\n${kp.map(k=>`- ${k.t?k.t+' ':''}${k.text}`).join('\n')}`, inbox:item.id, created:nowIso()});
+  /* first steps become Tasks so they show on the Tasks page and in the weekly plan */
+  const taskIds = []; const haveT = new Set([...C('tasks').values()].map(t=>t.title));
+  steps.filter(s=>!/^Exercise:/.test(s.t)).slice(0,3).forEach(s => { const title = `${String(kit.subject).slice(0,50)}: ${s.t}`.slice(0,190); if (haveT.has(title) || !L.addTask) return;
+    const id = L.addTask({title, ref:{kind:'path', id:pathId, title:String(kit.subject).slice(0,100)}, notes:s.how||'', links: s.url ? [{label:'Open', url:s.url}] : [], minutes: parseInt(s.dur)||30, due:''}, true); if (id) taskIds.push(id); });
   await patch('inbox', item.id, {status:'done', processedBy:by, processed:today(), error:null,
-    kit:{subject:String(kit.subject).slice(0,140), cat, level:kit.level||'', confidence:kit.confidence||'', summary, key_points:kp, exercise:String(kit.exercise||'').slice(0,400), plan:steps.map(s=>({t:s.t, minutes:parseInt(s.dur)||0}))},
-    result:{topicId:mainId, pathId, newTopics}});
-  toast(`Study kit ready: ${kit.subject}`);
+    kit:{subject:String(kit.subject).slice(0,140), cat, level:kit.level||'', confidence:kit.confidence||'', summary, key_points:kp, exercise:String(kit.exercise||'').slice(0,400), plan:steps.map(s=>({t:s.t, minutes:parseInt(s.dur)||0})), videos, searches:queries, next},
+    result:{topicId:mainId, pathId, newTopics, taskIds}});
+  toast(`Ready: ${kit.subject}. Added to your galaxy, bucket, tasks and review.`, 5000);
 }
-L.applyKit = applyKit;
+L.applyKit = applyKit; L.KIND_ICON = KIND_ICON; L.KIND_NAME = KIND_NAME;
 function addKitToWeek(item){
   const r = item.result||{}; const pth = C('paths').get(r.pathId); if (!pth) return;
   const start = weekStart(); const cur = C('plans').get(start);
@@ -2969,6 +3042,18 @@ function addKitToWeek(item){
     plan.days[best].items.push({kind:'path', ref:pth.id, title:`Kit · ${s.t}`, minutes: parseInt(s.dur)||25, why:'From your inbox', done:false}); }
   put('plans', start, plan); toast('Added the first steps to this week\'s plan.');
 }
+/* everything automatic: any pending item (pasted here, synced from your phone, shared) starts building by itself */
+let sweeping = false;
+async function autoSweep(){
+  if (sweeping || IN_CLAUDE || !aiOK() || document.hidden) return; sweeping = true;
+  try { const now = Date.now();
+    const list = [...C('inbox').values()].filter(i => !building.has(i.id) && !i.error && (i.source||'me')==='me' && (now - Date.parse(i.at||0) > 15000) &&
+      (i.status==='pending' || (i.status==='processing' && now - Date.parse(i.started||0) > 300000))).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+    for (const it of list.slice(0,2)) await buildKit(it, 'smart');
+  } catch(e){} sweeping = false;
+}
+setInterval(autoSweep, 30000); setTimeout(autoSweep, 6000);
+L.autoSweep = autoSweep;
 const ibFilter = {v:'all'};
 renderers.push(function inboxChrome(){
   const pend = [...C('inbox').values()].filter(i=>i.status==='pending' || i.status==='processing').length;
@@ -2977,7 +3062,7 @@ renderers.push(function inboxChrome(){
 renderers.push(function inboxView(){
   if (S.view!=='inbox') return;
   const a = document.activeElement; const ai = aiOK();
-  $('#ibNowWrap').hidden = !ai;
+  $('#ibNowWrap').hidden = !ai; $('#ibAdd').textContent = ai ? 'Add & build automatically' : 'Add to library';
   $('#ibHint').textContent = ai ? '' : (IN_CLAUDE ? 'Claude builds kits on the morning refresh.' : 'Your GitHub bot builds kits on its next run.');
   const all = [...C('inbox').values()].sort((x,y)=>String(y.at||y.added).localeCompare(String(x.at||x.added)));
   const counts = {all:all.length, waiting:all.filter(i=>i.status!=='done' && i.status!=='failed').length, done:all.filter(i=>i.status==='done').length, failed:all.filter(i=>i.status==='failed').length};
@@ -2986,7 +3071,10 @@ renderers.push(function inboxView(){
   if (a && $('#ibList').contains(a) && a.matches('input:not([type=checkbox]),textarea')) return;
   const list = all.filter(i => ibFilter.v==='all' || (ibFilter.v==='waiting' ? (i.status!=='done' && i.status!=='failed') : i.status===(ibFilter.v==='done'?'done':'failed')));
   $('#ibList').innerHTML = list.length ? list.map(i => kitCard(i, ai)).join('') : `<div class="empty">${all.length ? 'Nothing here.' : `Nothing yet. Paste a link above${IN_CLAUDE ? ', or send one to Claude in any chat and say "add this to my galaxy"' : ', or share it from your phone to Learning Galaxy (install the app first)'}.`}</div>`;
-  $$('#ibList [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
+  wireKit('#ibList');
+});
+function wireKit(root){
+  $$(root+' [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
     if (act==='build') buildKit(it, $('#ibTier').value);
     else if (act==='path') openDrawer('path', it.result.pathId);
     else if (act==='topic') openDrawer('topic', it.result.topicId);
@@ -2996,12 +3084,20 @@ renderers.push(function inboxView(){
       $('#itCancel').onclick = closeModal; $('#itSave').onclick = () => { patch('inbox', it.id, {text:$('#itText').value.slice(0,20000), status:'pending'}); closeModal(); };
       const bb = $('#itBuild'); if (bb) bb.onclick = async () => { const text = $('#itText').value.slice(0,20000); await patch('inbox', it.id, {text}); closeModal(); buildKit(Object.assign({}, it, {text}), $('#ibTier').value); }; });
     else if (act==='del') { del('inbox', it.id); toast('Removed from inbox. The topics and study plan it created stay.'); } });
-});
+}
+L.wireKit = wireKit;
+function videosHtml(k){
+  const v = (k&&k.videos)||[]; const q = (k&&k.searches)||[];
+  if (v.length) return `<div><span class="flabel">Watch · ${v.length} videos</span><div class="vgrid">${v.map(x=>`<a class="vcard" href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener"><img loading="lazy" alt="" src="https://i.ytimg.com/vi/${esc(x.id)}/mqdefault.jpg"><span class="vt">${esc(x.title)}</span><span class="faint vc">${esc(x.channel||'')}</span></a>`).join('')}</div></div>`;
+  if (q.length) return `<div><span class="flabel">Videos to watch</span><div class="chips">${q.map(x=>`<a class="chip" href="${esc(L.ytSearch(x))}" target="_blank" rel="noopener">▶ ${esc(x)}</a>`).join('')}</div>${IN_CLAUDE?'':'<div class="faint" style="font-size:12px;margin-top:4px">These open YouTube searches. Add a free YouTube API key in Settings to see the actual top videos here.</div>'}</div>`;
+  return '';
+}
+L.videosHtml = videosHtml; 
 function kitCard(i, ai){
   const k = i.kit; const r = i.result||{}; const pill = {pending:['Waiting','var(--warn)'], processing:['Building…','var(--accent)'], done:['Study kit','var(--good)'], failed:['Needs help','var(--crit)']}[i.status] || ['?','var(--line-2)'];
   const head = `<div class="row" style="justify-content:space-between;gap:8px"><span class="row" style="gap:8px;min-width:0"><span class="kind">${KIND_ICON[i.kind]||'↗'} ${esc(KIND_NAME[i.kind]||'Link')}</span><span class="pill" style="--c:${pill[1]}">${pill[0]}</span>${k?.confidence==='low'?'<span class="pill" title="Built from the title/caption only. Add the transcript for a better kit.">low detail</span>':''}</span><span class="faint mono" style="font-size:11.5px">${esc(relDate(i.added))}</span></div>`;
-  const src = `<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
-  if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url))}</h4>${src}
+  const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
+  if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
     ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : 'Your bot builds the kit on its next run.'}</p>`}
     <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build kit now</button>`:''}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
@@ -3009,21 +3105,23 @@ function kitCard(i, ai){
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
     <div style="font-size:14px">${md(k.summary||'')}</div>
     ${(k.key_points||[]).length?`<div><span class="flabel">Key points</span><ul class="kp">${k.key_points.map(p=>`<li>${p.t?`<span class="ts">${esc(p.t)}</span>`:''}${esc(p.text)}</li>`).join('')}</ul></div>`:''}
-    <div><span class="flabel">Topics</span><div class="chips">${main?`<button class="chip on" data-open="topic:${esc(main.id)}" style="--c:${esc(c.color)}"><span class="sw"></span>${esc(main.title)}</button>`:''}${nt.map(t=>`<button class="chip" data-open="topic:${esc(t.id)}"><span class="sw" style="--c:${esc(c.color)}"></span>${esc(t.title)} <span class="faint">suggested</span></button>`).join('')}</div></div>
+    <div><span class="flabel">Topics</span><div class="chips">${main?`<button class="chip on" data-open="topic:${esc(main.id)}" style="--c:${esc(c.color)}"><span class="sw"></span>${esc(main.title)}</button>`:''}${nt.map(t=>`<button class="chip" data-open="topic:${esc(t.id)}"><span class="sw" style="--c:${esc(c.color)}"></span>${esc(t.title)}${t.status==='suggested'?' <span class="faint">suggested</span>':''}</button>`).join('')}</div></div>
     ${pth?`<div><span class="flabel">Study plan · ${pr.done}/${pr.total}</span><ol class="kp">${(pth.steps||[]).map(s=>`<li style="${s.done?'text-decoration:line-through;color:var(--fg-3)':''}">${esc(s.t)}${s.dur?` <span class="faint mono" style="font-size:11.5px">${esc(s.dur.replace(':00',''))}m</span>`:''}</li>`).join('')}</ol></div>`:''}
-    ${pth && (pth.links||[]).length?`<div><span class="flabel">Resources</span><div class="chips">${pth.links.map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
+    ${videosHtml(k)}
+    ${pth && (pth.links||[]).filter(l=>!/youtube\.com\/watch/.test(l.url)).length?`<div><span class="flabel">Resources</span><div class="chips">${pth.links.filter(l=>!/youtube\.com\/watch/.test(l.url)).map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
     <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
 }
-$('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
-$('#ibNow').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, now:true, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
-$('#ibUrl').addEventListener('paste', () => setTimeout(() => { const u = firstUrl($('#ibUrl').value); if (u) $('#ibUrl').value = u; }, 0));
+L.kitCard = kitCard;
+$('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
+$('#ibUrl').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); $('#ibAdd').click(); } });
+$('#ibUrl').addEventListener('paste', () => setTimeout(() => { const v = $('#ibUrl').value.trim(); const u = firstUrl(v); if (u && v.length < u.length + 60) { $('#ibUrl').value = u; if (aiOK() && v.indexOf(u)===0 && v.length===u.length) $('#ibAdd').click(); } }, 0));
 
 /* share target (installed standalone app) + ?add=link */
 (function handleShare(){
   if (IN_CLAUDE) return; const q = new URLSearchParams(location.search); if (!q.has('url') && !q.has('text') && !q.has('add')) return;
   const url = q.get('url') || firstUrl(q.get('text')) || q.get('add') || ''; const note = [q.get('title'), (q.get('text')||'').replace(url,'').trim()].filter(Boolean).join(' · ').slice(0,300);
   try { history.replaceState(null, '', location.pathname); } catch(e){}
-  setTimeout(() => { setView('inbox'); $('#ibUrl').value = url; $('#ibNote').value = note; $('#ibNote').focus(); toast('Shared link ready. Add a note if you like, then add it.', 5000); }, 500);
+  setTimeout(async () => { setView('library'); const id = await addToInbox({url: url || [q.get('title'), q.get('text')].filter(Boolean).join(' ').slice(0,160), note: url ? note : ''}); if (id) toast('Shared to your library.', 4000); }, 900);
 })();
 
 /* ---------------- TRENDING ---------------- */
@@ -3547,6 +3645,107 @@ setTimeout(() => { if (!L.S.db) return;
   if (!L.LS.get('spatialSeeded', false)) { L.LS.set('spatialSeeded', true); if (!L.C('tracks').has('spatial-ai')) L.put('tracks', 'spatial-ai', TRACK); }
   if (!L.LS.get('dossierSeeded', false)) { L.LS.set('dossierSeeded', true); if (!L.C('research').size) L.put('research', 'rs-ai-spatial-awareness', DOSSIER); }
 }, 2500);
+})();
+(() => {
+'use strict';
+/* ================= LIBRARY · quick-add · learn-next · weekly digest ================= */
+const L = window.__LG;
+const { IN_CLAUDE, $, $$, esc, today, addDays, safeUrl, relDate, LS, toast, md, S, C, renderers, render, aiOK, openModal, closeModal, catOf, setView, reviewQueue } = L;
+const KI = L.KIND_ICON, KN = L.KIND_NAME;
+
+/* ---- YouTube key setting (browser only) ---- */
+(function(){ const p = $('#ytPanel'); if (!p) return; if (IN_CLAUDE) { p.hidden = true; return; }
+  const inp = $('#ytKey'); try { inp.value = LS.get('ytkey', ''); } catch(e){}
+  inp.oninput = () => { try { LS.set('ytkey', inp.value.trim()); } catch(e){} }; })();
+
+/* ---- quick add (+) on every page ---- */
+(function(){
+  const b = document.createElement('button'); b.className = 'fab'; b.type = 'button'; b.id = 'fabAdd'; b.title = 'Add a link or a subject to learn'; b.setAttribute('aria-label', 'Add a link or a subject to learn'); b.textContent = '+';
+  document.body.appendChild(b);
+  const open = (preset='') => openModal(`<h3>Add to your library</h3><p class="muted" style="margin:0;font-size:14px">Paste a link, or type what you want to learn. It builds a summary, a step-by-step path, videos and flashcards, and adds it to your galaxy, bucket, tasks and review.</p>
+    <div class="field"><label for="qaIn">Link or subject</label><input class="inp" id="qaIn" value="${esc(preset)}" placeholder="https://… or Microsoft Agent Framework"></div>
+    <div class="field"><label for="qaNote">Note (optional)</label><input class="inp" id="qaNote" placeholder="e.g. focus on the multi-agent part"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="qaCancel">Cancel</button><button class="btn primary" id="qaGo">Add &amp; build</button></div>`, () => {
+    $('#qaCancel').onclick = closeModal;
+    const go = async () => { const id = await L.addToInbox({url:$('#qaIn').value, note:$('#qaNote').value}); if (id) { closeModal(); if (S.view!=='library') toast(aiOK() ? 'Building. Watch it appear in your Library.' : 'Saved to your Library.', 3500); } };
+    $('#qaGo').onclick = go; $('#qaIn').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); go(); } }); });
+  b.onclick = async () => { let clip = ''; try { if (navigator.clipboard && navigator.clipboard.readText && document.hasFocus()) { const t = (await navigator.clipboard.readText()).trim(); if (/^https?:\/\/\S+$/.test(t)) clip = t; } } catch(e){} open(clip); };
+  L.openQuickAdd = open;
+})();
+
+/* ---- library page ---- */
+const lb = {kind:'all', q:''};
+const items = () => [...C('inbox').values()].sort((x,y) => String(y.at||y.added).localeCompare(String(x.at||x.added)));
+const isBusy = i => i.status==='pending' || i.status==='processing';
+
+renderers.push(function libraryChrome(){
+  const n = items().filter(isBusy).length; const b = $('#libBadge'); if (b) { b.hidden = !n; b.textContent = n; }
+});
+
+function digest(){
+  const all = items(); const cut = addDays(today(), -6);
+  const added = all.filter(i => String(i.added||'') >= cut);
+  const built = all.filter(i => i.status==='done' && String(i.processed||'') >= cut);
+  const paths = all.filter(i => i.status==='done' && i.result && C('paths').get(i.result.pathId));
+  let done = 0, total = 0; const nextUp = [];
+  for (const i of paths) { const p = C('paths').get(i.result.pathId); const pr = L.pathProgress(p); done += pr.done; total += pr.total; if (pr.next && pr.done < pr.total) nextUp.push({subject:i.kit?.subject||p.title, step:pr.next.t, pct:pr.pct, path:p.id}); }
+  const cards = paths.reduce((s,i) => s + (C('topics').get(i.result.topicId)?.cards||[]).length, 0);
+  const due = reviewQueue().length;
+  nextUp.sort((a,b) => b.pct - a.pct);
+  return {added:added.length, built:built.length, done, total, cards, due, nextUp:nextUp.slice(0,3), saved:all.length};
+}
+function digestText(d){
+  return [`Learning Galaxy · weekly library digest (${today()})`, `Saved this week: ${d.added} · built: ${d.built} · library total: ${d.saved}`, `Path steps done: ${d.done}/${d.total} · flashcards from your library: ${d.cards} · reviews due now: ${d.due}`,
+    ...(d.nextUp.length ? ['Pick up next:', ...d.nextUp.map(n => `- ${n.subject}: ${n.step}`)] : [])].join('\n');
+}
+
+function learnNext(){
+  const have = new Set([...C('topics').values()].map(t => String(t.title).toLowerCase()));
+  for (const i of items()) if (i.kind==='subject') have.add(String(i.title).toLowerCase());
+  const out = []; const seen = new Set();
+  for (const i of items()) for (const n of (i.kit?.next||[])) { const k = n.title.toLowerCase(); if (have.has(k) || seen.has(k)) continue; seen.add(k); out.push(Object.assign({from:i.kit?.subject||''}, n)); }
+  return out.slice(0, 8);
+}
+
+function libCard(i, ai){
+  const k = i.kit; const r = i.result||{}; const pth = r.pathId ? C('paths').get(r.pathId) : null; const pr = pth ? L.pathProgress(pth) : null; const main = r.topicId ? C('topics').get(r.topicId) : null;
+  const pill = {pending:['Waiting','var(--warn)'], processing:['Building…','var(--accent)'], done:['Ready','var(--good)'], failed:['Needs help','var(--crit)']}[i.status] || ['?','var(--line-2)'];
+  const title = k?.subject || i.title || i.url || 'Untitled'; const c = k ? catOf({cat:k.cat}) : null;
+  const sum = k ? String(k.summary||'').replace(/[#*_`>\[\]]/g,'').slice(0,220) : (i.status==='failed' ? (i.error||'Could not build this.') : 'Building the summary, path, videos and flashcards…');
+  const meta = [pr ? `${pr.done}/${pr.total} steps` : '', main?.cards?.length ? `${main.cards.length} cards` : '', (k?.videos?.length) ? `${k.videos.length} videos` : '', relDate(i.added)].filter(Boolean).join(' · ');
+  return `<details class="libc" data-lid="${esc(i.id)}"${lbOpen.has(i.id)?' open':''}><summary><div class="row" style="gap:8px;min-width:0;flex-wrap:nowrap"><span class="kind">${KI[i.kind]||'↗'} ${esc(KN[i.kind]||'Link')}</span><span class="pill" style="--c:${pill[1]}">${pill[0]}</span>${c?`<span class="dot" style="--c:${esc(c.color)}"></span><span class="faint" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span>`:''}<span class="faint mono" style="font-size:11.5px;margin-left:auto;white-space:nowrap">${esc(meta)}</span></div><div class="lt">${esc(title)}</div><div class="ls">${esc(sum)}</div></summary><div class="libb">${L.kitCard(i, ai)}</div></details>`;
+}
+const lbOpen = new Set();
+
+renderers.push(function libraryView(){
+  if (S.view!=='library') return;
+  const a = document.activeElement; if (a && (a.id==='lbAdd' || a.id==='lbSearch') && a.value) { /* keep typing intact */ }
+  const ai = aiOK(); const all = items();
+  $('#lbHint').textContent = ai ? 'Builds by itself as soon as you add it.' : (IN_CLAUDE ? 'Claude builds these on the next refresh.' : 'No AI provider is on in this browser, so your GitHub bot builds these on its next run. Turn one on in Settings to build instantly.');
+  const kinds = ['all', ...[...new Set(all.map(i=>i.kind))]];
+  $('#lbKinds').innerHTML = kinds.map(k => `<button class="chip ${lb.kind===k?'on':''}" data-lk="${esc(k)}">${k==='all'?'All':esc((KI[k]||'')+' '+(KN[k]||k))} <span class="faint mono">${k==='all'?all.length:all.filter(i=>i.kind===k).length}</span></button>`).join('');
+  $$('#lbKinds [data-lk]').forEach(b => b.onclick = () => { lb.kind = b.dataset.lk; render(); });
+  const d = digest();
+  $('#lbDigest').innerHTML = `<div class="row w" style="gap:14px"><span><b>${d.added}</b> <span class="faint">saved</span></span><span><b>${d.built}</b> <span class="faint">built</span></span><span><b>${d.done}/${d.total}</b> <span class="faint">path steps</span></span><span><b>${d.cards}</b> <span class="faint">flashcards</span></span><span><b>${d.due}</b> <span class="faint">reviews due</span></span></div>`
+    + (d.nextUp.length ? `<div><span class="flabel">Pick up next</span><ul class="kp">${d.nextUp.map(n=>`<li data-open="path:${esc(n.path)}" style="cursor:pointer"><b>${esc(n.subject)}</b> <span class="faint">${esc(n.step)}</span></li>`).join('')}</ul></div>` : '<span class="faint" style="font-size:13px">Add a subject and its first steps appear here.</span>');
+  const ln = learnNext();
+  $('#lbNext').innerHTML = ln.length ? ln.map((n,ix) => `<button class="chip" data-ln="${ix}" title="${esc(n.why||'')}${n.from?' · after '+esc(n.from):''}">+ ${esc(n.title)}</button>`).join('') : '<span class="faint" style="font-size:13px">Suggestions appear after your first kit is built.</span>';
+  $$('#lbNext [data-ln]').forEach(b => b.onclick = () => { const n = ln[+b.dataset.ln]; b.disabled = true; L.addToInbox({url:n.title, note:n.why ? 'Suggested after '+n.from : ''}); });
+  const ql = lb.q.trim().toLowerCase();
+  const list = all.filter(i => (lb.kind==='all' || i.kind===lb.kind) && (!ql || [i.title, i.url, i.note, i.kit?.subject, i.kit?.summary].join(' ').toLowerCase().includes(ql)));
+  if ($('#lbList').contains(a) && a.matches('input,textarea')) return;
+  $('#lbList').innerHTML = list.length ? list.map(i => libCard(i, ai)).join('') : `<div class="empty">${all.length ? 'Nothing matches.' : 'Your library is empty. Paste a link or type a subject above, or tap + anywhere.'}</div>`;
+  $$('#lbList details.libc').forEach(dt => dt.addEventListener('toggle', () => { if (dt.open) lbOpen.add(dt.dataset.lid); else lbOpen.delete(dt.dataset.lid); }));
+  L.wireKit('#lbList');
+});
+
+const goAdd = async () => { const v = $('#lbAdd').value; const id = await L.addToInbox({url:v}); if (id) $('#lbAdd').value = ''; };
+$('#lbGo').onclick = goAdd;
+$('#lbAdd').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); goAdd(); } });
+$('#lbAdd').addEventListener('paste', () => setTimeout(() => { const v = $('#lbAdd').value.trim(); if (/^https?:\/\/\S+$/.test(v) && aiOK()) goAdd(); }, 0));
+$('#lbSearch').addEventListener('input', e => { lb.q = e.target.value; render(); });
+$('#lbCopy').onclick = async () => { const t = digestText(digest()); try { await navigator.clipboard.writeText(t); toast('Digest copied.'); } catch(e){ openModal(`<h3>Weekly digest</h3><textarea class="inp" style="min-height:160px" readonly>${esc(t)}</textarea><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="dgX">Close</button></div>`, () => $('#dgX').onclick = closeModal); } };
+L.libraryDigest = () => digestText(digest());
 })();
 
 </script>
