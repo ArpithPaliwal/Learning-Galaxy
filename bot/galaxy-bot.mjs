@@ -230,7 +230,7 @@ function applyKit(db, item, kit, today) {
   const cards = (kit.flashcards || []).filter(c => c && c.q && c.a).slice(0, 6).map(c => ({q: clip(c.q, 300), a: clip(c.a, 500)}));
   const summary = String(kit.summary || '').slice(0, 3000); const base = {notes: '', related: [], srs: null, chat: [], teach: null, log: [{d: today, a: 'added'}], created: nowIso(), updated: nowIso()};
   let mainId; const ex = find(kit.main_topic);
-  if (ex) { mainId = ex[0]; const t = ex[1]; const have = new Set((t.resources || []).map(r => r.url)); t.resources = [...(t.resources || []), ...[orig, ...extra].filter(r => r && !have.has(r.url)).map(r => ({label: r.label, url: r.url}))]; t.cards = [...(t.cards || []), ...cards]; if (!t.explain) t.explain = summary; t.updated = nowIso(); }
+  if (ex) { mainId = ex[0]; const t = ex[1]; const have = new Set((t.resources || []).map(r => r.url)); t.resources = [...(t.resources || []), ...[orig, ...extra].filter(r => r && !have.has(r.url)).map(r => ({label: r.label, url: r.url}))]; t.cards = [...(t.cards || []), ...cards.filter(c => !(t.cards || []).some(o => o.q === c.q))]; if (!t.explain) t.explain = summary; t.updated = nowIso(); }
   else { mainId = newId(kit.main_topic || kit.subject); topics[mainId] = {...base, title: clip(kit.main_topic || kit.subject, 90), cat, status: 'todo', source: 'me', priority: 2, parent: null, notes: item.note || '', explain: summary, cards, why: item.kind === 'subject' ? 'You asked to learn this' : `From a ${KIND_NAME[item.kind] || 'link'} you sent`, resources: [orig, ...extra].filter(Boolean).map(r => ({label: r.label, url: r.url})), ...(cards.length ? {kitReview: true, srs: {S: 3, D: 5, reps: 1, lapses: 0, last: today, due: addDays(today, 1), interval: 1}} : {})}; }
   const newTopics = [];
   for (const r of (kit.topics || []).slice(0, item.kind === 'subject' ? 8 : 5)) { if (!r?.title || find(r.title)) continue; const p = find(r.parent); const id = newId(r.title);
@@ -238,9 +238,10 @@ function applyKit(db, item, kit, today) {
   const steps = (kit.plan || []).slice(0, 10).map((s, i) => ({id: 's' + (i + 1), t: clip(s.t || 'Step', 160), url: i === 0 ? (item.url || '') : '', dur: s.minutes ? `${Math.min(240, Math.max(5, +s.minutes || 20))}:00` : '', sec: '', done: false}));
   if (kit.exercise) steps.push({id: 's' + (steps.length + 1), t: 'Exercise: ' + clip(kit.exercise, 150), url: '', dur: '', sec: '', done: false});
   const kp = (kit.key_points || []).slice(0, 8).map(k => ({t: clip(k.t, 10), text: clip(k.text, 300)}));
-  const pathId = newId('kit ' + kit.subject);
+  const oldPath = item.result?.pathId && db.paths?.[item.result.pathId]; const pathId = oldPath ? item.result.pathId : newId('kit ' + kit.subject);
+  if (oldPath) steps.forEach(st => { if ((oldPath.steps || []).some(o => o.t === st.t && o.done)) st.done = true; });
   (db.paths ||= {})[pathId] = {title: (item.kind === 'subject' ? 'Learning path: ' : 'Study kit: ') + clip(kit.subject, 100), kind: 'kit', cat, url: item.url || '', source: 'me', steps, links: extra, notes: `${summary}\n\nKey points:\n${kp.map(k => `- ${k.t ? k.t + ' ' : ''}${k.text}`).join('\n')}`, inbox: item.id, created: nowIso(), updated: nowIso()};
-  Object.assign(item, {status: 'done', processedBy: 'bot', processed: today, error: null, updated: nowIso(),
+  Object.assign(item, {rebuild: null, status: 'done', processedBy: 'bot', processed: today, error: null, updated: nowIso(),
     kit: {subject: clip(kit.subject, 140), cat, level: kit.level || '', confidence: kit.confidence || '', summary, key_points: kp, exercise: clip(kit.exercise, 400), plan: steps.map(s => ({t: s.t, minutes: parseInt(s.dur) || 0})), videos: [], searches: (kit.video_search || []).slice(0, 4).map(q => clip(q, 120)), next: (kit.learn_next || []).filter(n => n?.title).slice(0, 3).map(n => ({title: clip(n.title, 100), why: clip(n.why, 160)}))},
     result: {topicId: mainId, pathId, newTopics}});
   return kit.subject;
