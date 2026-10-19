@@ -748,6 +748,7 @@ body.display .dhud{display:block}
                 <div class="field"><label for="aiBase">Base URL</label><input class="inp" id="aiBase" placeholder="https://…/v1"></div>
                 <div class="grid2" style="grid-template-columns:1fr 1fr 1fr"><div class="field"><label for="aiFast">Fast model</label><input class="inp" id="aiFast"></div><div class="field"><label for="aiSmart">Smart model</label><input class="inp" id="aiSmart"></div><div class="field"><label for="aiDeep">Deep model</label><input class="inp" id="aiDeep"></div></div>
               </div>
+              <div class="field" style="margin-top:10px" id="buildModeWrap"><label for="buildMode">Build my Library items with</label><select class="inp" id="buildMode"><option value="auto">Auto: this browser's AI if it is on, otherwise start my GitHub bot</option><option value="browser">This browser's AI only (API key above)</option><option value="bot">My GitHub bot: start a run automatically whenever I add something</option></select></div>
               <div class="field" style="margin-top:10px"><label for="aiDefTier">Default tier on every AI button</label><select class="inp" id="aiDefTier"><option value="fast">Fast</option><option value="smart">Smart</option><option value="deep">Deep</option></select></div>
               <div class="row" style="margin-top:12px"><button class="btn small" id="aiSave">Save</button><button class="btn small ghost" id="aiTest">Test connection</button><span class="faint" id="aiTestOut" style="font-size:13px"></span></div>
             </div>
@@ -923,6 +924,7 @@ const PROVIDERS = {
   anthropic:{label:'Anthropic API — Claude with your key', kind:'anthropic', base:'https://api.anthropic.com/v1', models:['claude-haiku-4-5','claude-sonnet-4-5','claude-opus-4-1']},
   openai:{label:'OpenAI', kind:'oai', base:'https://api.openai.com/v1', models:['gpt-4o-mini','gpt-4o','o3']},
   gemini:{label:'Google Gemini', kind:'oai', base:'https://generativelanguage.googleapis.com/v1beta/openai', models:['gemini-flash-lite-latest','gemini-flash-latest','gemini-flash-latest']},
+  groq:{label:'Groq (very fast, free tier)', kind:'oai', base:'https://api.groq.com/openai/v1', models:['llama-3.1-8b-instant','llama-3.3-70b-versatile','openai/gpt-oss-120b']},
   openrouter:{label:'OpenRouter (hundreds of models)', kind:'oai', base:'https://openrouter.ai/api/v1', models:['openai/gpt-4o-mini','anthropic/claude-sonnet-4.5','deepseek/deepseek-r1']},
   ollama:{label:'Ollama (local, free)', kind:'oai', base:'http://localhost:11434/v1', models:['llama3.2','qwen2.5:14b','qwen2.5:32b'], nokey:true},
   lmstudio:{label:'LM Studio (local, free)', kind:'oai', base:'http://localhost:1234/v1', models:['local-model','local-model','local-model'], nokey:true},
@@ -2480,7 +2482,7 @@ function fillSettings(){
   const p = profile(); $('#pName').value = p.name || ''; $('#pHours').value = p.hours || 4; $('#pGoals').value = p.goals || ''; $('#pRet').value = Math.round((p.retention||0.9)*100);
   const c = aiCfg(); const sel = $('#aiProvider');
   sel.innerHTML = Object.entries(PROVIDERS).map(([k,v]) => `<option value="${k}" ${k===c.provider?'selected':''} ${IN_CLAUDE && k!=='claude' ? 'disabled' : ''} ${!IN_CLAUDE && k==='claude' ? 'disabled' : ''}>${esc(v.label)}${IN_CLAUDE && k!=='claude' ? ' — standalone only' : ''}${!IN_CLAUDE && k==='claude' ? ' — claude.ai only' : ''}</option>`).join('');
-  showProvider(c.provider); $('#aiDefTier').value = c.defTier || 'smart';
+  showProvider(c.provider); $('#aiDefTier').value = c.defTier || 'smart'; const bm = $('#buildMode'); if (bm) { bm.value = LS.get('buildMode','auto'); $('#buildModeWrap').hidden = IN_CLAUDE; }
   $('#modePill').textContent = IN_CLAUDE ? 'Running on claude.ai' : 'Running standalone'; $('#modePill').style.setProperty('--c', IN_CLAUDE ? 'var(--accent)' : 'var(--gold)');
   const g = gistCfg(); $('#gToken').value = g.token; $('#gId').value = g.id; $('#gAuto').checked = !!g.auto; $('#gRepo').value = g.repo || ''; if (typeof gistSaved === 'function') gistSaved();
   $('#gistNote').textContent = IN_CLAUDE ? 'Pages on claude.ai cannot call GitHub, so Gist sync works in the standalone copy. Here, use Export / Import to move data.' : 'Keeps every device in sync through a private gist on your GitHub account.';
@@ -2496,9 +2498,10 @@ function fillSettings(){
 function showProvider(k){ const p = PROVIDERS[k]; const per = LS.get('ai.p.'+k, {});
   $('#aiFields').hidden = !!p.builtin;
   $('#aiNote').textContent = p.builtin ? (S.sample ? 'Uses Claude inside claude.ai. Pick Fast / Smart / Deep next to each AI button.' : 'Claude is not available in this view.') :
-    k==='ollama' ? 'Start Ollama with OLLAMA_ORIGINS=* so the browser can reach it. No key needed.' : k==='lmstudio' ? 'In LM Studio, start the local server and enable CORS. No key needed.' : k==='anthropic' ? 'Uses your Anthropic API key directly from the browser. Needs credit on your Anthropic account (console.anthropic.com → Billing).' : k==='gemini' ? 'Free tier: make a key at aistudio.google.com/apikey (no card needed). Free keys run the Flash models only. Paste the key, then tap Find my models.' : k==='openrouter' ? 'Some OpenRouter models are free (their IDs end in :free). Tap Find my models to pick one.' : 'Edit the model names to any model your account can use.';
+    k==='ollama' ? 'Start Ollama with OLLAMA_ORIGINS=* so the browser can reach it. No key needed.' : k==='lmstudio' ? 'In LM Studio, start the local server and enable CORS. No key needed.' : k==='anthropic' ? 'Uses your Anthropic API key directly from the browser. Needs credit on your Anthropic account (console.anthropic.com → Billing).' : k==='gemini' ? 'Free tier: make a key at aistudio.google.com/apikey (no card needed). Free keys run the Flash models only. Paste the key, then tap Find my models.' : k==='groq' ? 'Free tier: make a key at console.groq.com/keys. Very fast Llama and GPT-OSS models. Tap Find my models to see what your key can use.' : k==='openrouter' ? 'Some OpenRouter models are free (their IDs end in :free). Tap Find my models to pick one.' : 'Edit the model names to any model your account can use.';
   $('#aiKey').value = per.key || ''; $('#aiBase').value = per.base || p.base || ''; $('#aiFast').value = per.fast || p.models?.[0] || ''; $('#aiSmart').value = per.smart || p.models?.[1] || ''; $('#aiDeep').value = per.deep || p.models?.[2] || ''; }
 $('#aiProvider').onchange = e => showProvider(e.target.value);
+$('#buildMode').onchange = e => { LS.set('buildMode', e.target.value); toast(e.target.value==='bot' ? (botReady() ? 'New items now start your GitHub bot automatically.' : 'Saved. Add your token and Bot repo in Gist sync so the bot can be started.') : 'Saved.', 5000); render(); };
 $('#aiSave').onclick = () => { const k = $('#aiProvider').value; LS.set('ai', {provider:k, defTier:$('#aiDefTier').value});
   if (!PROVIDERS[k].builtin) LS.set('ai.p.'+k, {key:$('#aiKey').value.trim(), base:$('#aiBase').value.trim(), fast:$('#aiFast').value.trim(), smart:$('#aiSmart').value.trim(), deep:$('#aiDeep').value.trim()});
   $$('select.tier').forEach(s => s.innerHTML = tierOpts()); toast('AI settings saved.'); render(); };
@@ -2522,6 +2525,7 @@ async function findModels(){
       const lite = chat.filter(i => /lite/.test(i)); const full = chat.filter(i => !/lite/.test(i));
       const best = has('gemini-flash-latest') ? 'gemini-flash-latest' : (full.find(i => !/preview/.test(i)) || full[0]); const fast = has('gemini-flash-lite-latest') ? 'gemini-flash-lite-latest' : (lite.find(i => !/preview/.test(i)) || lite[0] || best);
       if (best) pick = [fast || best, best, best]; }
+    else if (k==='groq') { const f = ['llama-3.1-8b-instant'].find(has) || ids.find(i => /instant|8b/.test(i)); const sm = ['llama-3.3-70b-versatile'].find(has) || ids.find(i => /70b|versatile/.test(i)); const dp = ['openai/gpt-oss-120b'].find(has) || sm; if (f || sm) pick = [f || sm, sm || f, dp || sm || f]; }
     else if (k==='openrouter') { const free = ids.filter(i => /:free$/.test(i)); if (free.length) pick = [free[0], free[0], free[0]]; }
     else if (k==='anthropic') { const by = re => ids.find(i => re.test(i)); const h = by(/haiku/), so = by(/sonnet/), op = by(/opus/); if (h || so) pick = [h || so, so || h, op || so || h]; }
     if (pick) { $('#aiFast').value = pick[0]; $('#aiSmart').value = pick[1]; $('#aiDeep').value = pick[2]; $('#aiSave').click(); }
@@ -2974,6 +2978,18 @@ function detectKind(u){ const h = hostOf(u); if (/youtube\.com|youtu\.be/.test(h
 function firstUrl(s){ const m = String(s||'').match(/https?:\/\/[^\s<>"']+/); return m ? m[0].replace(/[).,]+$/,'') : ''; }
 L.detectKind = detectKind;
 const YT_KEY = () => LS.get('ytkey', '');
+/* how items get built: in this browser (API key) or by auto-starting the GitHub bot */
+const buildMode = () => IN_CLAUDE ? 'browser' : LS.get('buildMode', 'auto');
+const botOK = () => !IN_CLAUDE && !!(L.botReady && L.botReady());
+const useBrowser = () => buildMode()!=='bot' && aiOK();
+const useBot = () => botOK() && (buildMode()==='bot' || (buildMode()==='auto' && !aiOK()));
+let botT = null;
+function queueBot(ids, what='your new items', delay=8000){
+  ids.forEach(id => patch('inbox', id, {botAsked:nowIso(), status:'pending', error:null}));
+  clearTimeout(botT); toast('Starting your GitHub bot in a few seconds…', 3000);
+  botT = setTimeout(() => { LS.set('botLast', Date.now()); L.botRun('morning', what); }, delay);
+}
+L.buildMode = buildMode; L.useBot = useBot;
 const building = new Set();
 async function addToInbox({url='', note='', text='', now, later=false, tier='smart', title='', quiet=false}){
   const raw = String(url||'').trim(); const link = safeUrl(raw) || firstUrl(raw);
@@ -2992,16 +3008,17 @@ async function addToInbox({url='', note='', text='', now, later=false, tier='sma
   if (later) doc.later = true;
   await put('inbox', id, doc);
   if (later) { if (!quiet) toast(IN_CLAUDE ? 'Saved for later. Claude builds it on the next refresh.' : 'Saved for later. It builds on the next scheduled run, or tap Build now on it any time.', 4500); return id; }
-  if ((now===undefined ? true : now) && aiOK()) buildKit(Object.assign({id}, doc), tier);
-  else if (!quiet && L.botReady && L.botReady()) L.botRun('morning', 'this item');
+  if (now===false) { if (!quiet) toast('Saved to your library.'); return id; }
+  if (useBrowser()) buildKit(Object.assign({id}, doc), tier);
+  else if (useBot()) queueBot([id], 'this item');
   else if (!quiet && !IN_CLAUDE) { toast('Saved to your library.', 2500); setTimeout(howToBuild, 400); }
   else if (!quiet) toast('Saved. Claude builds the study kit on the next refresh.', 4500);
   return id;
 }
 /* already in the library: offer to do it again */
 function redoItem(it, tier='smart'){
-  if (aiOK()) buildKit(Object.assign({}, it), tier);
-  else { patch('inbox', it.id, {status:'pending', error:null, rebuild:true, later:null}); if (L.botReady && L.botReady()) L.botRun('morning', 'this item'); else toast('Queued. It rebuilds on the next run.'); }
+  if (useBrowser()) buildKit(Object.assign({}, it), tier);
+  else { patch('inbox', it.id, {status:'pending', error:null, rebuild:true, later:null}); if (useBot()) queueBot([it.id], 'this item'); else if (aiOK()) buildKit(Object.assign({}, it), tier); else howToBuild(); }
 }
 function askRedo(it, tier){
   const name = (it.kit?.subject || it.title || it.url || 'This').slice(0,80);
@@ -3017,7 +3034,7 @@ function howToBuild(){
     $('#htAi').onclick = () => goSetting('#aiProvider'); $('#htBot').onclick = () => goSetting('#gRepo'); $('#htX').onclick = closeModal; });
 }
 L.howToBuild = howToBuild;
-const addLabel = () => aiOK() ? 'Add & build now' : (L.botReady && L.botReady() ? 'Add & run bot now' : 'Add');
+const addLabel = () => useBrowser() ? 'Add & build now' : useBot() ? 'Add & run bot now' : aiOK() ? 'Add & build now' : 'Add';
 L.addLabel = addLabel; L.redoItem = redoItem;
 L.addToInbox = addToInbox;
 function kitPrompt(item){
@@ -3111,7 +3128,13 @@ function addKitToWeek(item){
 /* everything automatic: any pending item (pasted here, synced from your phone, shared) starts building by itself */
 let sweeping = false;
 async function autoSweep(){
-  if (sweeping || IN_CLAUDE || !aiOK() || document.hidden) return; sweeping = true;
+  if (sweeping || IN_CLAUDE || document.hidden) return;
+  if (!useBrowser()) { /* bot mode: start one run for items that are waiting (e.g. added on a phone) */
+    if (!useBot() || Date.now() - Number(LS.get('botLast', 0)) < 600000) return;
+    const now = Date.now(); const wait = [...C('inbox').values()].filter(i => i.status==='pending' && !i.later && !i.error && (now - Date.parse(i.at||0) > 15000) && (!i.botAsked || now - Date.parse(i.botAsked) > 1800000));
+    if (wait.length) queueBot(wait.map(i=>i.id), wait.length===1 ? 'this item' : wait.length+' waiting items');
+    return; }
+  sweeping = true;
   try { const now = Date.now();
     const list = [...C('inbox').values()].filter(i => !building.has(i.id) && !i.error && !i.later && (i.source||'me')==='me' && (now - Date.parse(i.at||0) > 15000) &&
       (i.status==='pending' || (i.status==='processing' && now - Date.parse(i.started||0) > 300000))).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
@@ -3143,7 +3166,7 @@ function wireKit(root){
   $$(root+' [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
     if (act==='build') buildKit(it, $('#ibTier').value);
     else if (act==='howto') howToBuild();
-    else if (act==='botnow') { if (it.status==='failed') patch('inbox', it.id, {status:'pending', error:null}); L.botRun('morning', 'this item'); }
+    else if (act==='botnow') queueBot([it.id], 'this item', 500);
     else if (act==='again') redoItem(it, $('#ibTier')?.value || 'smart');
     else if (act==='path') openDrawer('path', it.result.pathId);
     else if (act==='topic') openDrawer('topic', it.result.topicId);
@@ -3167,8 +3190,8 @@ function kitCard(i, ai){
   const head = `<div class="row" style="justify-content:space-between;gap:8px"><span class="row" style="gap:8px;min-width:0"><span class="kind">${KIND_ICON[i.kind]||'↗'} ${esc(KIND_NAME[i.kind]||'Link')}</span><span class="pill" style="--c:${pill[1]}">${pill[0]}</span>${k?.confidence==='low'?'<span class="pill" title="Built from the title/caption only. Add the transcript for a better kit.">low detail</span>':''}</span><span class="faint mono" style="font-size:11.5px">${esc(relDate(i.added))}</span></div>`;
   const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
   if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
-    ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${i.status==='processing' ? 'Building now…' : IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : ai ? 'Starts building in a few seconds.' : (L.botReady&&L.botReady()) ? 'Waiting for the bot. Tap Run bot now to do it right away.' : 'Not built yet: this browser has no AI turned on and the bot is not connected. Tap Build now to set it up.'}</p>`}
-    <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(L.botReady&&L.botReady()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`)}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${i.status==='processing' ? 'Building now…' : (i.botAsked && Date.now()-Date.parse(i.botAsked) < 900000) ? 'Your GitHub bot was started '+esc(relDate(String(i.botAsked).slice(0,10)))+' at '+esc(new Date(i.botAsked).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}))+'. Results appear here in 2 to 4 minutes.' : IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : useBrowser() ? 'Starts building in a few seconds.' : botOK() ? 'Waiting for your GitHub bot. Tap Run bot now to start it right away.' : ai ? 'Tap Build now.' : 'Not built yet: this browser has no AI turned on and the bot is not connected. Tap Build now to set it up.'}</p>`}
+    <div class="row w" style="gap:6px">${useBrowser()?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(botOK()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>${ai?`<button class="btn small ghost" data-ibact="build" data-id="${esc(i.id)}">Build here instead</button>`:''}`:(ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`))}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
   const pr = pth ? L.pathProgress(pth) : null;
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
