@@ -734,11 +734,13 @@ body.display .dhud{display:block}
             <div class="panel"><h3>GitHub Gist sync</h3>
               <p class="faint" id="gistNote" style="font-size:13px;margin:0 0 10px"></p>
               <div id="gistFields" class="stack" style="gap:10px">
-                <div class="field"><label for="gToken">GitHub token (gist scope, kept only in this browser)</label><input class="inp" id="gToken" type="password" autocomplete="off" placeholder="ghp_… or github_pat_…"></div>
+                <div class="field"><label for="gToken">GitHub token (gist scope, kept only in this browser)</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="inp" id="gToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="ghp_… or github_pat_…" style="flex:1;min-width:0"><button class="btn small ghost" id="gShow" type="button">Show</button></div></div>
                 <div class="field"><label for="gId">Gist ID (leave empty to create a private one)</label><input class="inp" id="gId" placeholder="auto"></div>
                 <label class="switch" style="align-self:flex-start"><input type="checkbox" id="gAuto"><span>Auto-sync (pulls on open, every minute and when you return; pushes ~5s after any change)</span></label>
                 <div class="field"><label for="gRepo">Bot repo (owner/name, optional: enables Refresh now)</label><input class="inp" id="gRepo" placeholder="arpith/learning-galaxy"></div>
                 <div class="row"><button class="btn small" id="gPush">Push now</button><button class="btn small ghost" id="gPull">Pull now</button><span class="faint" id="gOut" style="font-size:13px"></span></div>
+                <p class="faint" id="gSaved" style="font-size:13px;margin:0"></p>
+                <div class="field"><label for="gCode">Sync code: copy it here, paste it on your other device, and both fields fill in at once</label><div class="row" style="gap:6px;flex-wrap:nowrap"><input class="inp" id="gCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste a sync code here" style="flex:1;min-width:0"><button class="btn small ghost" id="gCodeCopy" type="button">Copy mine</button><button class="btn small" id="gCodeUse" type="button">Use</button></div></div>
               </div>
             </div>
             <div class="panel" id="gdPanel"><h3>Google Drive (your book)</h3>
@@ -2435,7 +2437,7 @@ function fillSettings(){
   sel.innerHTML = Object.entries(PROVIDERS).map(([k,v]) => `<option value="${k}" ${k===c.provider?'selected':''} ${IN_CLAUDE && k!=='claude' ? 'disabled' : ''} ${!IN_CLAUDE && k==='claude' ? 'disabled' : ''}>${esc(v.label)}${IN_CLAUDE && k!=='claude' ? ' — standalone only' : ''}${!IN_CLAUDE && k==='claude' ? ' — claude.ai only' : ''}</option>`).join('');
   showProvider(c.provider); $('#aiDefTier').value = c.defTier || 'smart';
   $('#modePill').textContent = IN_CLAUDE ? 'Running on claude.ai' : 'Running standalone'; $('#modePill').style.setProperty('--c', IN_CLAUDE ? 'var(--accent)' : 'var(--gold)');
-  const g = gistCfg(); $('#gToken').value = g.token; $('#gId').value = g.id; $('#gAuto').checked = !!g.auto; $('#gRepo').value = g.repo || '';
+  const g = gistCfg(); $('#gToken').value = g.token; $('#gId').value = g.id; $('#gAuto').checked = !!g.auto; $('#gRepo').value = g.repo || ''; if (typeof gistSaved === 'function') gistSaved();
   $('#gistNote').textContent = IN_CLAUDE ? 'Pages on claude.ai cannot call GitHub, so Gist sync works in the standalone copy. Here, use Export / Import to move data.' : 'Keeps every device in sync through a private gist on your GitHub account.';
   $('#gistFields').hidden = IN_CLAUDE;
   $('#standaloneBox').innerHTML = IN_CLAUDE ? `<p style="margin:0 0 10px">The standalone copy is the same app as one HTML file. It runs anywhere, keeps data in that browser (plus Gist sync), and uses any AI provider with your key.</p>
@@ -2460,7 +2462,14 @@ $('#pSave').onclick = () => { put('meta', 'profile', {name:$('#pName').value.tri
 $('#expBtn').onclick = exportBackup;
 $('#impFile').onchange = async e => { const f = e.target.files[0]; if (!f) return; setOut('#impOut', 'Reading…'); try { const n = await importBackup(JSON.parse(await f.text())); setOut('#impOut', `Imported ${n} items. Newer items you already had were kept.`); } catch(err){ setOut('#impOut', err.message || 'That file could not be read.'); } e.target.value = ''; };
 const saveGist = () => LS.set('gist', {token:$('#gToken').value.trim(), id:$('#gId').value.trim(), auto:$('#gAuto').checked, repo:$('#gRepo').value.trim().replace(/^https:\/\/github.com\//,'').replace(/\/$/,'')});
-['#gToken','#gId','#gAuto','#gRepo'].forEach(s => $(s).onchange = saveGist);
+const gistSaved = () => { const g = gistCfg(); const el = $('#gSaved'); if (el) el.textContent = g.token ? ('Saved on this device' + (g.id ? ' · gist '+g.id.slice(0,7)+'…' : ' · no gist yet, tap Push now') + (g.auto ? ' · auto-sync on' : ' · auto-sync off')) : 'Nothing saved yet. Paste a token or a sync code.'; };
+const saveGistNow = () => { saveGist(); gistSaved(); };
+['#gToken','#gId','#gAuto','#gRepo'].forEach(s => { $(s).onchange = saveGistNow; $(s).oninput = saveGistNow; });
+$('#gShow').onclick = () => { const t = $('#gToken'); const show = t.type === 'password'; t.type = show ? 'text' : 'password'; $('#gShow').textContent = show ? 'Hide' : 'Show'; };
+const syncCode = () => { const g = gistCfg(); return g.token ? 'LG1.' + btoa(JSON.stringify({t:g.token, i:g.id, r:g.repo||''})).replace(/=+$/,'') : ''; };
+$('#gCodeCopy').onclick = async () => { saveGistNow(); const c = syncCode(); if (!c) { toast('Add your token first.'); return; } try { await navigator.clipboard.writeText(c); toast('Sync code copied. Paste it on your other device. Keep it private: it contains your token.', 5000); } catch(e){ $('#gCode').value = c; $('#gCode').select(); toast('Copy the code from the box.'); } };
+$('#gCodeUse').onclick = () => { const v = $('#gCode').value.trim(); try { if (!v.startsWith('LG1.')) throw 0; const o = JSON.parse(atob(v.slice(4))); if (!o.t) throw 0; $('#gToken').value = o.t; $('#gId').value = o.i || ''; if (o.r) $('#gRepo').value = o.r; if (o.i) $('#gAuto').checked = true; saveGistNow(); $('#gCode').value = ''; toast('Sync code applied.'); if (o.i) gistPull(false); } catch(e){ toast('That is not a valid sync code.'); } };
+gistSaved(); try { if (!IN_CLAUDE && navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
 $('#gdPanel').hidden = IN_CLAUDE; $('#gdClient').value = (LS.get('gdrive',{}).clientId||''); $('#gdClient').onchange = () => LS.set('gdrive', Object.assign(LS.get('gdrive',{}), {clientId:$('#gdClient').value.trim()}));
 $('#gPush').onclick = () => { saveGist(); gistPush(false); }; $('#gPull').onclick = () => { saveGist(); gistPull(false); };
 async function downloadStandalone(){
