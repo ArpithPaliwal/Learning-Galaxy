@@ -2967,7 +2967,8 @@ async function addToInbox({url='', note='', text='', now, later=false, tier='sma
   if (later) { if (!quiet) toast(IN_CLAUDE ? 'Saved for later. Claude builds it on the next refresh.' : 'Saved for later. It builds on the next scheduled run, or tap Build now on it any time.', 4500); return id; }
   if ((now===undefined ? true : now) && aiOK()) buildKit(Object.assign({id}, doc), tier);
   else if (!quiet && L.botReady && L.botReady()) L.botRun('morning', 'this item');
-  else if (!quiet) toast(IN_CLAUDE ? 'Saved. Claude builds the study kit on the next refresh.' : 'Saved. It builds as soon as an AI provider is on, or on your bot\'s next run.', 4500);
+  else if (!quiet && !IN_CLAUDE) { toast('Saved to your library.', 2500); setTimeout(howToBuild, 400); }
+  else if (!quiet) toast('Saved. Claude builds the study kit on the next refresh.', 4500);
   return id;
 }
 /* already in the library: offer to do it again */
@@ -2980,6 +2981,15 @@ function askRedo(it, tier){
   openModal(`<h3>Already in your library</h3><p class="muted" style="margin:0;font-size:14px"><b>${esc(name)}</b> is already saved${it.status==='done'?' and built':''}. Do it again? It rebuilds the summary, path, videos and flashcards. Your progress on the steps is kept.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="arNo">Keep as it is</button><button class="btn primary" id="arYes">Do it again</button></div>`, () => {
     $('#arNo').onclick = closeModal; $('#arYes').onclick = () => { closeModal(); redoItem(it, tier); }; });
 }
+function goSetting(sel){ closeModal(); setView('settings'); setTimeout(() => { const el = $(sel); if (el) { el.scrollIntoView({block:'center', behavior:'smooth'}); el.focus(); } }, 250); }
+function howToBuild(){
+  openModal(`<h3>Build it now</h3><p class="muted" style="margin:0;font-size:14px">Nothing in this browser can build it yet. Pick one:</p>
+    <div class="panel" style="padding:12px"><b>1. Turn on AI here</b> <span class="faint">(fastest, about 20 seconds)</span><p class="muted" style="margin:6px 0 8px;font-size:13.5px">Settings → AI engine: choose a provider (Anthropic, OpenAI, Gemini, OpenRouter, or a free local Ollama), paste your own API key, Save. Everything you add then builds by itself on this device.</p><button class="btn small primary" id="htAi">Open AI settings</button></div>
+    <div class="panel" style="padding:12px"><b>2. Use your GitHub bot</b><p class="muted" style="margin:6px 0 8px;font-size:13.5px">Settings → Gist sync: fill Bot repo with <span class="mono">ArpithPaliwal/Learning-Galaxy</span>. Your GitHub token also needs the <span class="mono">repo</span> and <span class="mono">workflow</span> scopes, and the bot's repo secrets (GIST_TOKEN, GIST_ID, LLM_API_KEY) must be set. Then every item gets a Run bot now button.</p><button class="btn small" id="htBot">Open sync settings</button></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="htX">Close</button></div>`, () => {
+    $('#htAi').onclick = () => goSetting('#aiProvider'); $('#htBot').onclick = () => goSetting('#gRepo'); $('#htX').onclick = closeModal; });
+}
+L.howToBuild = howToBuild;
 const addLabel = () => aiOK() ? 'Add & build now' : (L.botReady && L.botReady() ? 'Add & run bot now' : 'Add');
 L.addLabel = addLabel; L.redoItem = redoItem;
 L.addToInbox = addToInbox;
@@ -3105,6 +3115,7 @@ renderers.push(function inboxView(){
 function wireKit(root){
   $$(root+' [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
     if (act==='build') buildKit(it, $('#ibTier').value);
+    else if (act==='howto') howToBuild();
     else if (act==='botnow') { if (it.status==='failed') patch('inbox', it.id, {status:'pending', error:null}); L.botRun('morning', 'this item'); }
     else if (act==='again') redoItem(it, $('#ibTier')?.value || 'smart');
     else if (act==='path') openDrawer('path', it.result.pathId);
@@ -3129,8 +3140,8 @@ function kitCard(i, ai){
   const head = `<div class="row" style="justify-content:space-between;gap:8px"><span class="row" style="gap:8px;min-width:0"><span class="kind">${KIND_ICON[i.kind]||'↗'} ${esc(KIND_NAME[i.kind]||'Link')}</span><span class="pill" style="--c:${pill[1]}">${pill[0]}</span>${k?.confidence==='low'?'<span class="pill" title="Built from the title/caption only. Add the transcript for a better kit.">low detail</span>':''}</span><span class="faint mono" style="font-size:11.5px">${esc(relDate(i.added))}</span></div>`;
   const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
   if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
-    ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : 'Your bot builds the kit on its next run.'}</p>`}
-    <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(L.botReady&&L.botReady()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>`:'')}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${i.status==='processing' ? 'Building now…' : IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : ai ? 'Starts building in a few seconds.' : (L.botReady&&L.botReady()) ? 'Waiting for the bot. Tap Run bot now to do it right away.' : 'Not built yet: this browser has no AI turned on and the bot is not connected. Tap Build now to set it up.'}</p>`}
+    <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(L.botReady&&L.botReady()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`)}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
   const pr = pth ? L.pathProgress(pth) : null;
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
@@ -3746,7 +3757,7 @@ function libCard(i, ai){
   const k = i.kit; const r = i.result||{}; const pth = r.pathId ? C('paths').get(r.pathId) : null; const pr = pth ? L.pathProgress(pth) : null; const main = r.topicId ? C('topics').get(r.topicId) : null;
   const pill = {pending:['Waiting','var(--warn)'], processing:['Building…','var(--accent)'], done:['Ready','var(--good)'], failed:['Needs help','var(--crit)']}[i.status] || ['?','var(--line-2)'];
   const title = k?.subject || i.title || i.url || 'Untitled'; const c = k ? catOf({cat:k.cat}) : null;
-  const sum = k ? String(k.summary||'').replace(/[#*_`>\[\]]/g,'').slice(0,220) : (i.status==='failed' ? (i.error||'Could not build this.') : 'Building the summary, path, videos and flashcards…');
+  const sum = k ? String(k.summary||'').replace(/[#*_`>\[\]]/g,'').slice(0,220) : (i.status==='failed' ? (i.error||'Could not build this.') : i.status==='processing' ? 'Building the summary, path, videos and flashcards…' : aiOK() ? 'Starts building in a few seconds…' : 'Not built yet. Open it and tap Build now.');
   const meta = [pr ? `${pr.done}/${pr.total} steps` : '', main?.cards?.length ? `${main.cards.length} cards` : '', (k?.videos?.length) ? `${k.videos.length} videos` : '', relDate(i.added)].filter(Boolean).join(' · ');
   return `<details class="libc" data-lid="${esc(i.id)}"${lbOpen.has(i.id)?' open':''}><summary><div class="row" style="gap:8px;min-width:0;flex-wrap:nowrap"><span class="kind">${KI[i.kind]||'↗'} ${esc(KN[i.kind]||'Link')}</span><span class="pill" style="--c:${pill[1]}">${pill[0]}</span>${c?`<span class="dot" style="--c:${esc(c.color)}"></span><span class="faint" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.name)}</span>`:''}<span class="faint mono" style="font-size:11.5px;margin-left:auto;white-space:nowrap">${esc(meta)}</span></div><div class="lt">${esc(title)}</div><div class="ls">${esc(sum)}</div></summary><div class="libb">${L.kitCard(i, ai)}</div></details>`;
 }
