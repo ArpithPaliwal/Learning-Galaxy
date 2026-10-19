@@ -2416,6 +2416,20 @@ document.addEventListener('click', async e => {
   else { id = L.createTopic({title:(n.topic || n.title).slice(0,90), cat: C('categories').has(n.cat) ? n.cat : (sortedCats()[0]?.id||'ai'), status:'todo', source:'me', notes:n.summary||'', resources: res ? [res] : []}); toast('Saved to your to-learn list.'); }
   if (id) patch('news', n.id, {savedTopic:id});
 });
+/* "do it now": start the bot (or Claude's refresh) right away instead of waiting for the schedule */
+function botReady(){ if (IN_CLAUDE) return !!(S.mcp && (C('meta').get('refresh')||{}).triggerId); const g = gistCfg(); return !!(g.token && g.repo); }
+async function botRun(task='morning', what='your items'){
+  if (IN_CLAUDE) { const m = C('meta').get('refresh')||{}; if (!S.mcp || !m.triggerId) { toast('Refresh is not set up here yet.'); return false; }
+    try { await S.mcp.callTool(CLAUDE_REMOTE, 'fire_trigger', {trigger_id:m.triggerId}); toast('Started. '+what+' will be ready in a few minutes.', 5000); return true; } catch(e){ toast('Could not start it: '+(e.message||'error'), 6000); return false; } }
+  const g = gistCfg(); if (!g.token || !g.repo) { toast('Add your GitHub token and bot repo in Settings → Gist sync to run the bot now.', 6000); return false; }
+  try { await L.gistPush(true);
+    const r = await fetch(`https://api.github.com/repos/${g.repo}/actions/workflows/learning-galaxy-bot.yml/dispatches`, {method:'POST', headers:{authorization:'Bearer '+g.token, accept:'application/vnd.github+json', 'content-type':'application/json'}, body:JSON.stringify({ref:'main', inputs:{task}})});
+    if (!r.ok) throw new Error(r.status===404 ? 'repo or workflow not found' : r.status===403 ? 'token needs Actions write access' : 'GitHub said '+r.status);
+    toast('Bot started for '+what+'. Results appear here in 2 to 4 minutes.', 6000);
+    [100000, 200000, 320000].forEach(ms => setTimeout(() => { try { gistPull(true); } catch(e){} }, ms)); return true;
+  } catch(e){ toast('Could not start the bot: '+e.message, 6000); return false; }
+}
+L.botReady = botReady; L.botRun = botRun;
 $('#refreshNow').onclick = async () => { const b = $('#refreshNow'); b.disabled = true; const m = C('meta').get('refresh')||{};
   if (!IN_CLAUDE) { const g = gistCfg();
     try { const r = await fetch(`https://api.github.com/repos/${g.repo}/actions/workflows/learning-galaxy-bot.yml/dispatches`, {method:'POST', headers:{authorization:'Bearer '+g.token, accept:'application/vnd.github+json', 'content-type':'application/json'}, body:JSON.stringify({ref:'main', inputs:{task:'morning'}})});
@@ -3009,26 +3023,27 @@ async function applyKit(item, kit, by){
   const res = [orig, ...extra, ...vidLinks].filter(Boolean);
   let mainId; const ex = find(kit.main_topic);
   if (ex) { mainId = ex.id; const have = new Set((ex.resources||[]).map(r=>r.url)); const add = cards.length && !(ex.cards||[]).length;
-    patch('topics', ex.id, {resources:[...(ex.resources||[]), ...res.filter(r=>!have.has(r.url)).map(r=>({label:r.label, url:r.url}))], cards:[...(ex.cards||[]), ...cards], ...(ex.explain ? {} : {explain:summary}), ...(add && !ex.srs ? {kitReview:true, srs:tomorrow()} : {})}); }
+    patch('topics', ex.id, {resources:[...(ex.resources||[]), ...res.filter(r=>!have.has(r.url)).map(r=>({label:r.label, url:r.url}))], cards:[...(ex.cards||[]), ...cards.filter(c => !(ex.cards||[]).some(o => o.q===c.q))], ...(ex.explain ? {} : {explain:summary}), ...(add && !ex.srs ? {kitReview:true, srs:tomorrow()} : {})}); }
   else mainId = L.createTopic({title:String(kit.main_topic||kit.subject).slice(0,90), cat, status:'todo', source:'me', priority:2, notes:item.note||'', explain:summary, cards, why: subj ? 'You asked to learn this' : `From a ${KIND_NAME[item.kind]||'link'} you sent`, resources:res.map(r=>({label:r.label, url:r.url})), ...(cards.length ? {kitReview:true, srs:tomorrow()} : {})});
   const newTopics = [];
   for (const r of (kit.topics||[]).slice(0, subj?8:5)) { if (!r || !r.title || find(r.title)) continue; const p = find(r.parent);
     newTopics.push(L.createTopic({title:String(r.title).slice(0,90), cat, status: subj ? 'todo' : 'suggested', source:'ai', why:String(r.why||'').slice(0,220), parent: p ? p.id : mainId, priority:2})); }
-  const pathId = newId('kit '+kit.subject);
+  const oldPath = item.result?.pathId && C('paths').get(item.result.pathId); const pathId = oldPath ? item.result.pathId : newId('kit '+kit.subject);
   const plan = (kit.plan||[]).slice(0,10);
   const steps = plan.map((s,i) => { const q = String(s.video_search||'').slice(0,120); const fv = q && videos.length ? (found[queries.indexOf(q)]||[])[0] : null;
     return {id:'s'+(i+1), t:String(s.t||'Step').slice(0,160), url: (i===0 && item.url) ? item.url : (fv ? fv.url : ''), dur: s.minutes ? `${clamp(Number(s.minutes)||20,5,240)}:00` : '', sec:'', done:false, how:String(s.how||'').slice(0,200), search:q}; });
   if (kit.exercise) steps.push({id:'s'+(steps.length+1), t:'Exercise: '+String(kit.exercise).slice(0,150), url:'', dur:'', sec:'', done:false});
   const kp = (kit.key_points||[]).slice(0,8).map(k=>({t:String(k.t||'').slice(0,10), text:String(k.text||'').slice(0,300)}));
   const next = (kit.learn_next||[]).filter(n=>n&&n.title).slice(0,3).map(n=>({title:String(n.title).slice(0,100), why:String(n.why||'').slice(0,160)}));
+  if (oldPath) steps.forEach(st => { const o = (oldPath.steps||[]).find(x => x.t===st.t); if (o && o.done) st.done = true; });
   await put('paths', pathId, {title:(subj?'Learning path: ':'Study kit: ')+String(kit.subject).slice(0,100), kind:'kit', cat, url:item.url||'', source:'me', steps, links:[...extra, ...vidLinks], notes:`${summary}\n\nKey points:\n${kp.map(k=>`- ${k.t?k.t+' ':''}${k.text}`).join('\n')}`, inbox:item.id, created:nowIso()});
   /* first steps become Tasks so they show on the Tasks page and in the weekly plan */
   const taskIds = []; const haveT = new Set([...C('tasks').values()].map(t=>t.title));
   steps.filter(s=>!/^Exercise:/.test(s.t)).slice(0,3).forEach(s => { const title = `${String(kit.subject).slice(0,50)}: ${s.t}`.slice(0,190); if (haveT.has(title) || !L.addTask) return;
     const id = L.addTask({title, ref:{kind:'path', id:pathId, title:String(kit.subject).slice(0,100)}, notes:s.how||'', links: s.url ? [{label:'Open', url:s.url}] : [], minutes: parseInt(s.dur)||30, due:''}, true); if (id) taskIds.push(id); });
-  await patch('inbox', item.id, {status:'done', processedBy:by, processed:today(), error:null,
+  await patch('inbox', item.id, {status:'done', processedBy:by, processed:today(), error:null, rebuild:null,
     kit:{subject:String(kit.subject).slice(0,140), cat, level:kit.level||'', confidence:kit.confidence||'', summary, key_points:kp, exercise:String(kit.exercise||'').slice(0,400), plan:steps.map(s=>({t:s.t, minutes:parseInt(s.dur)||0})), videos, searches:queries, next},
-    result:{topicId:mainId, pathId, newTopics, taskIds}});
+    result:{topicId:mainId, pathId, newTopics:[...new Set([...(item.result?.newTopics||[]), ...newTopics])], taskIds:[...new Set([...(item.result?.taskIds||[]), ...taskIds])]}});
   toast(`Ready: ${kit.subject}. Added to your galaxy, bucket, tasks and review.`, 5000);
 }
 L.applyKit = applyKit; L.KIND_ICON = KIND_ICON; L.KIND_NAME = KIND_NAME;
@@ -3063,7 +3078,7 @@ renderers.push(function inboxView(){
   if (S.view!=='inbox') return;
   const a = document.activeElement; const ai = aiOK();
   $('#ibNowWrap').hidden = !ai; $('#ibAdd').textContent = ai ? 'Add & build automatically' : 'Add to library';
-  $('#ibHint').textContent = ai ? '' : (IN_CLAUDE ? 'Claude builds kits on the morning refresh.' : 'Your GitHub bot builds kits on its next run.');
+  $('#ibHint').textContent = ai ? '' : (IN_CLAUDE ? 'Claude builds kits on the morning refresh.' : 'No AI is on in this browser. Use Run bot now on an item, or the bot builds it on its next scheduled run.');
   const all = [...C('inbox').values()].sort((x,y)=>String(y.at||y.added).localeCompare(String(x.at||x.added)));
   const counts = {all:all.length, waiting:all.filter(i=>i.status!=='done' && i.status!=='failed').length, done:all.filter(i=>i.status==='done').length, failed:all.filter(i=>i.status==='failed').length};
   $('#ibFilter').innerHTML = [['all','Everything'],['waiting','Waiting'],['done','Study kits'],['failed','Needs help']].map(([k,l])=>`<button class="chip ${ibFilter.v===k?'on':''}" data-ibf="${k}">${l} <span class="faint mono">${counts[k]}</span></button>`).join('');
@@ -3076,6 +3091,8 @@ renderers.push(function inboxView(){
 function wireKit(root){
   $$(root+' [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
     if (act==='build') buildKit(it, $('#ibTier').value);
+    else if (act==='botnow') { if (it.status==='failed') patch('inbox', it.id, {status:'pending', error:null}); L.botRun('morning', 'this item'); }
+    else if (act==='again') { if (aiOK()) buildKit(Object.assign({}, it), $('#ibTier')?.value || 'smart'); else { patch('inbox', it.id, {status:'pending', error:null, rebuild:true}); L.botRun('morning', 'this item'); } }
     else if (act==='path') openDrawer('path', it.result.pathId);
     else if (act==='topic') openDrawer('topic', it.result.topicId);
     else if (act==='week') addKitToWeek(it);
@@ -3099,7 +3116,7 @@ function kitCard(i, ai){
   const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
   if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
     ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : 'Your bot builds the kit on its next run.'}</p>`}
-    <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build kit now</button>`:''}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(L.botReady&&L.botReady()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>`:'')}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
   const pr = pth ? L.pathProgress(pth) : null;
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
@@ -3109,7 +3126,7 @@ function kitCard(i, ai){
     ${pth?`<div><span class="flabel">Study plan · ${pr.done}/${pr.total}</span><ol class="kp">${(pth.steps||[]).map(s=>`<li style="${s.done?'text-decoration:line-through;color:var(--fg-3)':''}">${esc(s.t)}${s.dur?` <span class="faint mono" style="font-size:11.5px">${esc(s.dur.replace(':00',''))}m</span>`:''}</li>`).join('')}</ol></div>`:''}
     ${videosHtml(k)}
     ${pth && (pth.links||[]).filter(l=>!/youtube\.com\/watch/.test(l.url)).length?`<div><span class="flabel">Resources</span><div class="chips">${pth.links.filter(l=>!/youtube\.com\/watch/.test(l.url)).map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
-    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${(ai||(L.botReady&&L.botReady()))?`<button class="btn small ghost" data-ibact="again" data-id="${esc(i.id)}" title="Rebuild this from scratch. Your progress on the steps is kept.">Do it again</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
 }
 L.kitCard = kitCard;
 $('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
@@ -3265,7 +3282,7 @@ function drawDossier(root, r){
   const haveTitles = new Set([...C('topics').values()].map(t=>t.title.toLowerCase())); const taskTitles = new Set([...C('tasks').values()].map(t=>t.title.toLowerCase()));
   root.innerHTML = `<div class="view-head"><div><button class="btn small ghost" id="rsBack">← All research</button><div class="eyebrow" style="margin-top:12px">${esc(MODES[r.mode]||'Learn it')} · requested ${esc(relDate(r.added))}${r.researchedBy?` · researched by ${esc(r.researchedBy)}`:''}</div><h2>${esc(d?.title || r.query)}</h2>${d?.summary?`<p>${esc(d.summary)}</p>`:''}</div>
       <div class="row"><span class="pill" style="--c:${pill[1]}">${r.working?'Working…':pill[0]}</span><label class="switch" title="Re-check weekly for what's new"><input type="checkbox" id="rsWatch" ${r.watch?'checked':''}><span>Keep updated</span></label></div></div>
-    ${!d ? `<div class="panel"><p class="muted" style="margin:0">${r.status==='failed' ? esc(r.error||'Research failed.') : IN_CLAUDE ? 'Claude researches this on the web tonight. It will be here in the morning.' : 'Your bot researches this on its next run.'}</p>${ai?`<div class="row" style="margin-top:10px"><span class="ai-row"><button class="btn small primary" id="rsDraftOne">Draft now with AI</button>${tierHtml('rsTier1')}</span></div>`:''}</div>` : `
+    ${!d ? `<div class="panel"><p class="muted" style="margin:0">${r.status==='failed' ? esc(r.error||'Research failed.') : IN_CLAUDE ? 'Claude researches this on the web tonight. It will be here in the morning.' : 'Your bot researches this on its next run.'}</p>${ai?`<div class="row" style="margin-top:10px"><span class="ai-row"><button class="btn small primary" id="rsDraftOne">Draft now with AI</button>${tierHtml('rsTier1')}</span></div>`:''}${!ai && L.botReady && L.botReady() ? `<div class="row" style="margin-top:10px"><button class="btn small primary" id="rsBotNow">Research now (bot)</button></div>` : ''}</div>` : `
     <div class="grid-2" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
       <div class="stack">
         <div class="panel stack">
@@ -3289,7 +3306,7 @@ function drawDossier(root, r){
           <div class="row" style="margin-top:10px"><button class="btn small" id="rsToTopic">${haveTitles.has(String(d.title||'').toLowerCase())?'Update topic in galaxy':'Add to galaxy as a topic'}</button></div></div>
         <div class="panel"><h3>Links &amp; videos</h3>${L.linksHtml('rs', d.resources)}${(d.sources||[]).length?`<div class="sub">Sources</div><ul class="res">${d.sources.map(s=>`<li><span class="faint">↗</span><a href="${esc(safeUrl(s.url))}" target="_blank" rel="noopener">${esc(s.label||hostOf(s.url))}</a></li>`).join('')}</ul>`:''}</div>
         <div class="panel"><h3>Improve it</h3><textarea class="inp" id="rsImp" placeholder="e.g. add a free self-hosted option, go deeper on the math, add a Python example"></textarea>
-          <div class="row" style="margin-top:8px">${ai?`<span class="ai-row"><button class="btn small primary" id="rsImpNow">Improve now</button>${tierHtml('rsImpTier')}</span>`:''}<button class="btn small" id="rsImpLater">Improve tonight with web research</button></div></div>
+          <div class="row" style="margin-top:8px">${ai?`<span class="ai-row"><button class="btn small primary" id="rsImpNow">Improve now</button>${tierHtml('rsImpTier')}</span>`:''}<button class="btn small" id="rsImpLater">${L.botReady&&L.botReady()?'Improve now with web research (bot)':'Improve tonight with web research'}</button>${ai||(L.botReady&&L.botReady())?`<button class="btn small ghost" id="rsAgain" title="Research it again from scratch">Do it again</button>`:''}</div></div>
         <div class="panel"><h3>My notes</h3><textarea class="inp" id="rsNotes" placeholder="Your takeaways">${esc(r.notes||'')}</textarea></div>
         <div class="panel"><h3>History</h3><ul class="mini">${(r.history||[]).slice().reverse().map(h=>`<li style="cursor:default"><span class="m" style="min-width:70px">${esc(relDate(h.d))}</span><span style="font-size:13px">${esc(h.text)}</span></li>`).join('')}</ul></div>
       </div>
@@ -3298,6 +3315,7 @@ function drawDossier(root, r){
   $('#rsBack').onclick = () => { S.researchId = null; render(); };
   $('#rsWatch').onchange = e => patch('research', r.id, {watch:e.target.checked});
   $('#rsDel').onclick = () => { $('#rsDelWrap').innerHTML = `<span class="row"><button class="btn small danger" id="rsDelYes">Delete for good</button><button class="btn small ghost" id="rsDelNo">Keep</button></span>`; $('#rsDelYes').onclick = () => { del('research', r.id); S.researchId = null; }; $('#rsDelNo').onclick = () => { root.__busy = false; render(); }; };
+  const bn = $('#rsBotNow'); if (bn) bn.onclick = () => { if (r.status==='failed') patch('research', r.id, {status:'pending', error:null}); L.botRun('morning', 'this research'); };
   const d1 = $('#rsDraftOne'); if (d1) d1.onclick = () => draftDossier(r, $('#rsTier1').value);
   if (!d) return;
   const notes = $('#rsNotes'); notes.oninput = L.debounceSave('rsnotes', () => patch('research', r.id, {notes:notes.value})); notes.onblur = () => L.flushPending();
@@ -3315,7 +3333,8 @@ function drawDossier(root, r){
     L.openTrack(id); toast('Academy track created.'); };
   const imp = () => $('#rsImp').value.trim();
   const now = $('#rsImpNow'); if (now) now.onclick = () => { if (imp().length < 4) { toast('Say what to improve.'); return; } improveNow(r, imp(), $('#rsImpTier').value); };
-  $('#rsImpLater').onclick = () => { if (imp().length < 4) { toast('Say what to improve.'); return; } patch('research', r.id, {status:'improve', improveNote:imp(), history:[...(r.history||[]), {d:today(), by:'me', text:'Asked to improve: '+imp().slice(0,150)}]}); $('#rsImp').value=''; toast(IN_CLAUDE ? 'Queued. Improved tonight with web research.' : 'Queued. Your bot improves it on its next run.'); };
+  $('#rsImpLater').onclick = () => { if (imp().length < 4) { toast('Say what to improve.'); return; } patch('research', r.id, {status:'improve', improveNote:imp(), history:[...(r.history||[]), {d:today(), by:'me', text:'Asked to improve: '+imp().slice(0,150)}]}); $('#rsImp').value=''; if (L.botReady && L.botReady()) L.botRun('morning', 'this research'); else toast(IN_CLAUDE ? 'Queued. Improved tonight with web research.' : 'Queued. Your bot improves it on its next run.'); };
+  const again = $('#rsAgain'); if (again) again.onclick = () => { if (ai) draftDossier(r, 'smart'); else { patch('research', r.id, {status:'pending', history:[...(r.history||[]), {d:today(), by:'me', text:'Asked to research again'}]}); L.botRun('morning', 'this research'); } };
 }
 function guessCat(){ return S.cat!=='all' && C('categories').has(S.cat) ? S.cat : (C('categories').has('ai') ? 'ai' : sortedCats()[0]?.id || 'ai'); }
 function mdTable(src){ // render a markdown table if present, else normal markdown
