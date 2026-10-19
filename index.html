@@ -588,7 +588,7 @@ body.display .dhud{display:block}
       <section id="v-library" class="view" hidden>
         <div class="view-head"><div><div class="eyebrow">Library</div><h2>Everything you have saved to learn</h2><p>Every link you paste and every subject you type lands here with its summary, videos, step-by-step path and flashcards. It also appears in your galaxy, bucket, tasks and daily review.</p></div></div>
         <div class="panel" style="margin-bottom:14px">
-          <div class="row" style="gap:8px;flex-wrap:nowrap"><input class="inp" id="lbAdd" placeholder="Paste a link, or type what you want to learn, e.g. Microsoft Agent Framework" style="flex:1;min-width:0"><button class="btn primary" id="lbGo">Add</button></div>
+          <div class="row" style="gap:8px;flex-wrap:nowrap"><input class="inp" id="lbAdd" placeholder="Paste a link, or type what you want to learn, e.g. Microsoft Agent Framework" style="flex:1;min-width:0"><button class="btn primary" id="lbGo">Add &amp; build now</button><button class="btn" id="lbLater" title="Save it now, build it on the next scheduled run">Add for later</button></div>
           <div class="faint" style="font-size:12.5px;margin-top:6px" id="lbHint"></div>
         </div>
         <div class="grid-2" style="margin-bottom:14px"><div class="panel"><h3>This week <button class="btn small ghost" id="lbCopy" style="margin-left:auto">Copy digest</button></h3><div id="lbDigest" class="stack" style="gap:8px"></div></div><div class="panel"><h3>Learn next</h3><div id="lbNext" class="chips"></div></div></div>
@@ -603,7 +603,7 @@ body.display .dhud{display:block}
           <div class="field"><label for="ibUrl">Link, or just the name of what you want to learn</label><input class="inp" id="ibUrl" placeholder="Paste a YouTube / reel / arXiv / GitHub / article link, or type e.g. Microsoft Agent Framework"></div>
           <div class="field" style="margin-top:10px"><label for="ibNote">What caught your eye? (optional, helps a lot for reels)</label><input class="inp" id="ibNote" placeholder="e.g. explains KV cache, or the tool at 0:45"></div>
           <details style="margin-top:10px"><summary class="faint" style="cursor:pointer;font-size:13.5px">Paste the transcript, caption or text for instant, more accurate results</summary><textarea class="inp" id="ibText" style="margin-top:8px" placeholder="YouTube: … → Show transcript → copy. Instagram: copy the caption. Papers: paste the abstract."></textarea></details>
-          <div class="row" style="margin-top:12px"><button class="btn primary" id="ibAdd">Add to library</button><span class="ai-row" id="ibNowWrap"><select class="tier" id="ibTier" aria-label="AI model tier"></select></span><span class="faint" style="font-size:12.5px" id="ibHint"></span></div>
+          <div class="row" style="margin-top:12px"><button class="btn primary" id="ibAdd">Add &amp; build now</button><button class="btn" id="ibLater" title="Save it now, build it on the next scheduled run (or tap Build now on it later)">Add for later</button><span class="ai-row" id="ibNowWrap"><select class="tier" id="ibTier" aria-label="AI model tier"></select></span><span class="faint" style="font-size:12.5px" id="ibHint"></span></div>
         </div>
         <div class="chips" id="ibFilter" style="margin-bottom:12px"></div>
         <div id="ibList" class="stack"></div>
@@ -2948,26 +2948,40 @@ function firstUrl(s){ const m = String(s||'').match(/https?:\/\/[^\s<>"']+/); re
 L.detectKind = detectKind;
 const YT_KEY = () => LS.get('ytkey', '');
 const building = new Set();
-async function addToInbox({url='', note='', text='', now, tier='smart', title='', quiet=false}){
+async function addToInbox({url='', note='', text='', now, later=false, tier='smart', title='', quiet=false}){
   const raw = String(url||'').trim(); const link = safeUrl(raw) || firstUrl(raw);
   let id, doc;
   if (link) {
-    const dup = [...C('inbox').values()].find(i => i.url===link); if (dup) { toast('Already in your library.'); return dup.id; }
+    const dup = [...C('inbox').values()].find(i => i.url===link); if (dup) { askRedo(dup, tier); return dup.id; }
     id = newId(KIND_NAME[detectKind(link)]+'-'+hostOf(link));
     doc = {url:link, kind:detectKind(link), note:String(note).slice(0,500), text:String(text).slice(0,20000), title:String(title).slice(0,200), status:'pending', added:today(), at:nowIso(), source:'me'};
   } else {
     const subj = (title || raw).replace(/\s+/g,' ').trim().slice(0,160);
     if (subj.length < 2) { toast('Paste a link, or type what you want to learn.'); return null; }
-    const dup = [...C('inbox').values()].find(i => i.kind==='subject' && String(i.title).toLowerCase()===subj.toLowerCase()); if (dup) { toast('Already in your library.'); return dup.id; }
+    const dup = [...C('inbox').values()].find(i => i.kind==='subject' && String(i.title).toLowerCase()===subj.toLowerCase()); if (dup) { askRedo(dup, tier); return dup.id; }
     id = newId('subject '+subj);
     doc = {url:'', kind:'subject', note:String(note).slice(0,500), text:String(text).slice(0,20000), title:subj, status:'pending', added:today(), at:nowIso(), source:'me'};
   }
+  if (later) doc.later = true;
   await put('inbox', id, doc);
-  const auto = (now===undefined ? true : now) && aiOK();
-  if (auto) buildKit(Object.assign({id}, doc), tier);
+  if (later) { if (!quiet) toast(IN_CLAUDE ? 'Saved for later. Claude builds it on the next refresh.' : 'Saved for later. It builds on the next scheduled run, or tap Build now on it any time.', 4500); return id; }
+  if ((now===undefined ? true : now) && aiOK()) buildKit(Object.assign({id}, doc), tier);
+  else if (!quiet && L.botReady && L.botReady()) L.botRun('morning', 'this item');
   else if (!quiet) toast(IN_CLAUDE ? 'Saved. Claude builds the study kit on the next refresh.' : 'Saved. It builds as soon as an AI provider is on, or on your bot\'s next run.', 4500);
   return id;
 }
+/* already in the library: offer to do it again */
+function redoItem(it, tier='smart'){
+  if (aiOK()) buildKit(Object.assign({}, it), tier);
+  else { patch('inbox', it.id, {status:'pending', error:null, rebuild:true, later:null}); if (L.botReady && L.botReady()) L.botRun('morning', 'this item'); else toast('Queued. It rebuilds on the next run.'); }
+}
+function askRedo(it, tier){
+  const name = (it.kit?.subject || it.title || it.url || 'This').slice(0,80);
+  openModal(`<h3>Already in your library</h3><p class="muted" style="margin:0;font-size:14px"><b>${esc(name)}</b> is already saved${it.status==='done'?' and built':''}. Do it again? It rebuilds the summary, path, videos and flashcards. Your progress on the steps is kept.</p><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="arNo">Keep as it is</button><button class="btn primary" id="arYes">Do it again</button></div>`, () => {
+    $('#arNo').onclick = closeModal; $('#arYes').onclick = () => { closeModal(); redoItem(it, tier); }; });
+}
+const addLabel = () => aiOK() ? 'Add & build now' : (L.botReady && L.botReady() ? 'Add & run bot now' : 'Add');
+L.addLabel = addLabel; L.redoItem = redoItem;
 L.addToInbox = addToInbox;
 function kitPrompt(item){
   const cats = sortedCats().map(c=>`${c.id}: ${c.name}`).join(', ');
@@ -2989,7 +3003,7 @@ Rules: 4-6 key points, ${subj?'5-8 sub-topics/prerequisites in learning order':'
 async function buildKit(item, tier='smart'){
   if (!aiOK()) { toast('Turn on an AI provider in Settings first.'); return; }
   if (building.has(item.id)) return; building.add(item.id);
-  await patch('inbox', item.id, {status:'processing', started:nowIso(), error:null});
+  await patch('inbox', item.id, {status:'processing', started:nowIso(), error:null, later:null});
   try { const kit = await AI.json(kitPrompt(item), {tier}); if (!kit || !kit.subject) throw {code:'invalid_json'}; await applyKit(item, kit, 'me'); }
   catch(e){ aiError(e); patch('inbox', item.id, {status: item.status==='done' ? 'done' : 'pending', error: e.code||'error'}); }
   finally { building.delete(item.id); }
@@ -3062,7 +3076,7 @@ let sweeping = false;
 async function autoSweep(){
   if (sweeping || IN_CLAUDE || !aiOK() || document.hidden) return; sweeping = true;
   try { const now = Date.now();
-    const list = [...C('inbox').values()].filter(i => !building.has(i.id) && !i.error && (i.source||'me')==='me' && (now - Date.parse(i.at||0) > 15000) &&
+    const list = [...C('inbox').values()].filter(i => !building.has(i.id) && !i.error && !i.later && (i.source||'me')==='me' && (now - Date.parse(i.at||0) > 15000) &&
       (i.status==='pending' || (i.status==='processing' && now - Date.parse(i.started||0) > 300000))).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
     for (const it of list.slice(0,2)) await buildKit(it, 'smart');
   } catch(e){} sweeping = false;
@@ -3077,7 +3091,7 @@ renderers.push(function inboxChrome(){
 renderers.push(function inboxView(){
   if (S.view!=='inbox') return;
   const a = document.activeElement; const ai = aiOK();
-  $('#ibNowWrap').hidden = !ai; $('#ibAdd').textContent = ai ? 'Add & build automatically' : 'Add to library';
+  $('#ibNowWrap').hidden = !ai; $('#ibAdd').textContent = addLabel();
   $('#ibHint').textContent = ai ? '' : (IN_CLAUDE ? 'Claude builds kits on the morning refresh.' : 'No AI is on in this browser. Use Run bot now on an item, or the bot builds it on its next scheduled run.');
   const all = [...C('inbox').values()].sort((x,y)=>String(y.at||y.added).localeCompare(String(x.at||x.added)));
   const counts = {all:all.length, waiting:all.filter(i=>i.status!=='done' && i.status!=='failed').length, done:all.filter(i=>i.status==='done').length, failed:all.filter(i=>i.status==='failed').length};
@@ -3092,7 +3106,7 @@ function wireKit(root){
   $$(root+' [data-ibact]').forEach(b => b.onclick = () => { const it = C('inbox').get(b.dataset.id); if (!it) return; const act = b.dataset.ibact;
     if (act==='build') buildKit(it, $('#ibTier').value);
     else if (act==='botnow') { if (it.status==='failed') patch('inbox', it.id, {status:'pending', error:null}); L.botRun('morning', 'this item'); }
-    else if (act==='again') { if (aiOK()) buildKit(Object.assign({}, it), $('#ibTier')?.value || 'smart'); else { patch('inbox', it.id, {status:'pending', error:null, rebuild:true}); L.botRun('morning', 'this item'); } }
+    else if (act==='again') redoItem(it, $('#ibTier')?.value || 'smart');
     else if (act==='path') openDrawer('path', it.result.pathId);
     else if (act==='topic') openDrawer('topic', it.result.topicId);
     else if (act==='week') addKitToWeek(it);
@@ -3130,6 +3144,7 @@ function kitCard(i, ai){
 }
 L.kitCard = kitCard;
 $('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
+$('#ibLater').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, later:true}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
 $('#ibUrl').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); $('#ibAdd').click(); } });
 $('#ibUrl').addEventListener('paste', () => setTimeout(() => { const v = $('#ibUrl').value.trim(); const u = firstUrl(v); if (u && v.length < u.length + 60) { $('#ibUrl').value = u; if (aiOK() && v.indexOf(u)===0 && v.length===u.length) $('#ibAdd').click(); } }, 0));
 
@@ -3684,9 +3699,10 @@ const KI = L.KIND_ICON, KN = L.KIND_NAME;
   const open = (preset='') => openModal(`<h3>Add to your library</h3><p class="muted" style="margin:0;font-size:14px">Paste a link, or type what you want to learn. It builds a summary, a step-by-step path, videos and flashcards, and adds it to your galaxy, bucket, tasks and review.</p>
     <div class="field"><label for="qaIn">Link or subject</label><input class="inp" id="qaIn" value="${esc(preset)}" placeholder="https://… or Microsoft Agent Framework"></div>
     <div class="field"><label for="qaNote">Note (optional)</label><input class="inp" id="qaNote" placeholder="e.g. focus on the multi-agent part"></div>
-    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="qaCancel">Cancel</button><button class="btn primary" id="qaGo">Add &amp; build</button></div>`, () => {
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="qaCancel">Cancel</button><button class="btn" id="qaLater" title="Save it now, build it on the next scheduled run">Add for later</button><button class="btn primary" id="qaGo">${esc(L.addLabel())}</button></div>`, () => {
     $('#qaCancel').onclick = closeModal;
     const go = async () => { const id = await L.addToInbox({url:$('#qaIn').value, note:$('#qaNote').value}); if (id) { closeModal(); if (S.view!=='library') toast(aiOK() ? 'Building. Watch it appear in your Library.' : 'Saved to your Library.', 3500); } };
+    $('#qaLater').onclick = async () => { const id = await L.addToInbox({url:$('#qaIn').value, note:$('#qaNote').value, later:true}); if (id) closeModal(); };
     $('#qaGo').onclick = go; $('#qaIn').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); go(); } }); });
   b.onclick = async () => { let clip = ''; try { if (navigator.clipboard && navigator.clipboard.readText && document.hasFocus()) { const t = (await navigator.clipboard.readText()).trim(); if (/^https?:\/\/\S+$/.test(t)) clip = t; } } catch(e){} open(clip); };
   L.openQuickAdd = open;
@@ -3740,7 +3756,7 @@ renderers.push(function libraryView(){
   if (S.view!=='library') return;
   const a = document.activeElement; if (a && (a.id==='lbAdd' || a.id==='lbSearch') && a.value) { /* keep typing intact */ }
   const ai = aiOK(); const all = items();
-  $('#lbHint').textContent = ai ? 'Builds by itself as soon as you add it.' : (IN_CLAUDE ? 'Claude builds these on the next refresh.' : 'No AI provider is on in this browser, so your GitHub bot builds these on its next run. Turn one on in Settings to build instantly.');
+  $('#lbGo').textContent = L.addLabel(); $('#lbHint').textContent = ai ? 'Builds by itself as soon as you add it.' : (IN_CLAUDE ? 'Claude builds these on the next refresh.' : 'No AI provider is on in this browser, so your GitHub bot builds these on its next run. Turn one on in Settings to build instantly.');
   const kinds = ['all', ...[...new Set(all.map(i=>i.kind))]];
   $('#lbKinds').innerHTML = kinds.map(k => `<button class="chip ${lb.kind===k?'on':''}" data-lk="${esc(k)}">${k==='all'?'All':esc((KI[k]||'')+' '+(KN[k]||k))} <span class="faint mono">${k==='all'?all.length:all.filter(i=>i.kind===k).length}</span></button>`).join('');
   $$('#lbKinds [data-lk]').forEach(b => b.onclick = () => { lb.kind = b.dataset.lk; render(); });
@@ -3760,6 +3776,7 @@ renderers.push(function libraryView(){
 
 const goAdd = async () => { const v = $('#lbAdd').value; const id = await L.addToInbox({url:v}); if (id) $('#lbAdd').value = ''; };
 $('#lbGo').onclick = goAdd;
+$('#lbLater').onclick = async () => { const id = await L.addToInbox({url:$('#lbAdd').value, later:true}); if (id) $('#lbAdd').value = ''; };
 $('#lbAdd').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); goAdd(); } });
 $('#lbAdd').addEventListener('paste', () => setTimeout(() => { const v = $('#lbAdd').value.trim(); if (/^https?:\/\/\S+$/.test(v) && aiOK()) goAdd(); }, 0));
 $('#lbSearch').addEventListener('input', e => { lb.q = e.target.value; render(); });
