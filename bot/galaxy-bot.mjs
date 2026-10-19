@@ -43,7 +43,7 @@ async function saveGist(obj) {
 const PROVIDERS = {
   openai: {base: 'https://api.openai.com/v1', model: 'gpt-4o-mini'},
   anthropic: {base: 'https://api.anthropic.com/v1', model: 'claude-haiku-4-5'},
-  gemini: {base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-flash'},
+  gemini: {base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-flash-latest'},
   openrouter: {base: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini'},
   groq: {base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile'},
   custom: {base: '', model: ''}
