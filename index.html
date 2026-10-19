@@ -922,7 +922,7 @@ const PROVIDERS = {
   claude:{label:'Claude (built into claude.ai)', builtin:true},
   anthropic:{label:'Anthropic API — Claude with your key', kind:'anthropic', base:'https://api.anthropic.com/v1', models:['claude-haiku-4-5','claude-sonnet-4-5','claude-opus-4-1']},
   openai:{label:'OpenAI', kind:'oai', base:'https://api.openai.com/v1', models:['gpt-4o-mini','gpt-4o','o3']},
-  gemini:{label:'Google Gemini', kind:'oai', base:'https://generativelanguage.googleapis.com/v1beta/openai', models:['gemini-2.5-flash','gemini-2.5-pro','gemini-2.5-pro']},
+  gemini:{label:'Google Gemini', kind:'oai', base:'https://generativelanguage.googleapis.com/v1beta/openai', models:['gemini-flash-lite-latest','gemini-flash-latest','gemini-flash-latest']},
   openrouter:{label:'OpenRouter (hundreds of models)', kind:'oai', base:'https://openrouter.ai/api/v1', models:['openai/gpt-4o-mini','anthropic/claude-sonnet-4.5','deepseek/deepseek-r1']},
   ollama:{label:'Ollama (local, free)', kind:'oai', base:'http://localhost:11434/v1', models:['llama3.2','qwen2.5:14b','qwen2.5:32b'], nokey:true},
   lmstudio:{label:'LM Studio (local, free)', kind:'oai', base:'http://localhost:1234/v1', models:['local-model','local-model','local-model'], nokey:true},
@@ -995,6 +995,7 @@ function learnerContext(){
 }
 function aiError(e){
   const c = e && e.code;
+  if (/credit balance|billing|insufficient_quota|exceeded your current quota/i.test(String(e&&e.message||''))) { toast('Your AI account has no credit left. Add credit with that provider, or switch to Google Gemini (free tier) in Settings → AI engine.', 8000); console.warn(e); return; }
   if (c==='not_granted' || c==='sampling_disabled' || c==='not_declared') { toast('AI is turned off for this page. Allow Claude for it, or pick another provider in Settings (standalone).'); }
   else if (c==='rate_limited' || c==='http_429') toast('The AI is busy. Try again in a minute.');
   else if (c==='http_401' || c==='http_403') toast('Your API key was rejected. Check it in Settings.');
@@ -2495,13 +2496,39 @@ function fillSettings(){
 function showProvider(k){ const p = PROVIDERS[k]; const per = LS.get('ai.p.'+k, {});
   $('#aiFields').hidden = !!p.builtin;
   $('#aiNote').textContent = p.builtin ? (S.sample ? 'Uses Claude inside claude.ai. Pick Fast / Smart / Deep next to each AI button.' : 'Claude is not available in this view.') :
-    k==='ollama' ? 'Start Ollama with OLLAMA_ORIGINS=* so the browser can reach it. No key needed.' : k==='lmstudio' ? 'In LM Studio, start the local server and enable CORS. No key needed.' : k==='anthropic' ? 'Uses your Anthropic API key directly from the browser. Use model IDs from your Anthropic console.' : 'Edit the model names to any model your account can use.';
+    k==='ollama' ? 'Start Ollama with OLLAMA_ORIGINS=* so the browser can reach it. No key needed.' : k==='lmstudio' ? 'In LM Studio, start the local server and enable CORS. No key needed.' : k==='anthropic' ? 'Uses your Anthropic API key directly from the browser. Needs credit on your Anthropic account (console.anthropic.com → Billing).' : k==='gemini' ? 'Free tier: make a key at aistudio.google.com/apikey (no card needed). Free keys run the Flash models only. Paste the key, then tap Find my models.' : k==='openrouter' ? 'Some OpenRouter models are free (their IDs end in :free). Tap Find my models to pick one.' : 'Edit the model names to any model your account can use.';
   $('#aiKey').value = per.key || ''; $('#aiBase').value = per.base || p.base || ''; $('#aiFast').value = per.fast || p.models?.[0] || ''; $('#aiSmart').value = per.smart || p.models?.[1] || ''; $('#aiDeep').value = per.deep || p.models?.[2] || ''; }
 $('#aiProvider').onchange = e => showProvider(e.target.value);
 $('#aiSave').onclick = () => { const k = $('#aiProvider').value; LS.set('ai', {provider:k, defTier:$('#aiDefTier').value});
   if (!PROVIDERS[k].builtin) LS.set('ai.p.'+k, {key:$('#aiKey').value.trim(), base:$('#aiBase').value.trim(), fast:$('#aiFast').value.trim(), smart:$('#aiSmart').value.trim(), deep:$('#aiDeep').value.trim()});
   $$('select.tier').forEach(s => s.innerHTML = tierOpts()); toast('AI settings saved.'); render(); };
-$('#aiTest').onclick = async () => { $('#aiSave').click(); setOut('#aiTestOut', 'Testing…'); try { const t = await AI.ask('Reply with exactly: Learning Galaxy connected.', {tier:'fast'}); setOut('#aiTestOut', '✓ '+String(t).slice(0,60)); } catch(e){ setOut('#aiTestOut', '✗ '+(e.code||'error')+' '+String(e.message||'').slice(0,80)); } };
+$('#aiTest').onclick = async () => { $('#aiSave').click(); setOut('#aiTestOut', 'Testing…'); try { const t = await AI.ask('Reply with exactly: Learning Galaxy connected.', {tier:'smart'}); setOut('#aiTestOut', '✓ '+String(t).slice(0,60)); } catch(e){ const m = String(e.message||''); setOut('#aiTestOut', /credit balance|billing|insufficient_quota|exceeded your current quota/i.test(m) ? '✗ The key works, but this account has no credit. Add credit, or switch to Google Gemini (free).' : (e.code==='http_404' || /not found|does not exist|model/i.test(m) && /40[04]/.test(e.code||'')) ? '✗ That model is not available to your key. Tap Find my models.' : '✗ '+(e.code||'error')+' '+m.slice(0,80)); } };
+/* list the models this key can use and pick sensible ones */
+async function findModels(){
+  const k = $('#aiProvider').value; const p = PROVIDERS[k]; if (!p || p.builtin) return;
+  const key = $('#aiKey').value.trim(); const base = ($('#aiBase').value.trim() || p.base || '').replace(/\/$/,'');
+  if (!base) { setOut('#aiTestOut', 'Add the base URL first.'); return; }
+  if (!key && !p.nokey) { setOut('#aiTestOut', 'Paste your API key first.'); return; }
+  setOut('#aiTestOut', 'Looking up your models…');
+  try {
+    const headers = p.kind==='anthropic' ? {'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true'} : (key ? {authorization:'Bearer '+key} : {});
+    const r = await fetch(base+'/models'+(p.kind==='anthropic'?'?limit=100':''), {headers}); if (!r.ok) throw new Error('http_'+r.status);
+    const j = await r.json(); let ids = (j.data||j.models||[]).map(m => String(m.id||m.name||'').replace(/^models\//,'')).filter(Boolean);
+    if (!ids.length) throw new Error('no models returned');
+    let dl = $('#aiModelList'); if (!dl) { dl = document.createElement('datalist'); dl.id = 'aiModelList'; document.body.appendChild(dl); }
+    dl.innerHTML = ids.map(i => `<option value="${esc(i)}">`).join(''); ['#aiFast','#aiSmart','#aiDeep'].forEach(s => $(s).setAttribute('list','aiModelList'));
+    const has = id => ids.includes(id); let pick = null;
+    if (k==='gemini') { const chat = ids.filter(i => /^gemini-/.test(i) && /flash/.test(i) && !/(image|tts|audio|live|embed|vision|exp|thinking)/.test(i)).sort().reverse();
+      const lite = chat.filter(i => /lite/.test(i)); const full = chat.filter(i => !/lite/.test(i));
+      const best = has('gemini-flash-latest') ? 'gemini-flash-latest' : (full.find(i => !/preview/.test(i)) || full[0]); const fast = has('gemini-flash-lite-latest') ? 'gemini-flash-lite-latest' : (lite.find(i => !/preview/.test(i)) || lite[0] || best);
+      if (best) pick = [fast || best, best, best]; }
+    else if (k==='openrouter') { const free = ids.filter(i => /:free$/.test(i)); if (free.length) pick = [free[0], free[0], free[0]]; }
+    else if (k==='anthropic') { const by = re => ids.find(i => re.test(i)); const h = by(/haiku/), so = by(/sonnet/), op = by(/opus/); if (h || so) pick = [h || so, so || h, op || so || h]; }
+    if (pick) { $('#aiFast').value = pick[0]; $('#aiSmart').value = pick[1]; $('#aiDeep').value = pick[2]; $('#aiSave').click(); }
+    setOut('#aiTestOut', `Found ${ids.length} models.${pick ? ' Picked: '+pick[1]+'. Saved. Now tap Test connection.' : ' Pick one in each box (they now suggest your models).'}`);
+  } catch(e){ setOut('#aiTestOut', '✗ Could not list models: '+(e.message||'error')+'. Check the key.'); }
+}
+const fmBtn = document.createElement('button'); fmBtn.className = 'btn small ghost'; fmBtn.id = 'aiModels'; fmBtn.type = 'button'; fmBtn.textContent = 'Find my models'; $('#aiTest').after(fmBtn); fmBtn.onclick = findModels;
 $('#pSave').onclick = () => { put('meta', 'profile', {name:$('#pName').value.trim().slice(0,40), hours:clamp(Number($('#pHours').value)||4, 1, 40), goals:$('#pGoals').value.trim().slice(0,600), retention:clamp((Number($('#pRet').value)||90)/100, 0.75, 0.97)}); toast('Profile saved.'); };
 $('#expBtn').onclick = exportBackup;
 $('#impFile').onchange = async e => { const f = e.target.files[0]; if (!f) return; setOut('#impOut', 'Reading…'); try { const n = await importBackup(JSON.parse(await f.text())); setOut('#impOut', `Imported ${n} items. Newer items you already had were kept.`); } catch(err){ setOut('#impOut', err.message || 'That file could not be read.'); } e.target.value = ''; };
