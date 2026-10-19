@@ -172,10 +172,11 @@ async function updateAcademy(db, today) {
 
 
 /* ---------------- Inbox: build study kits from links ---------------- */
-const KIND_NAME = {youtube: 'YouTube', instagram: 'Instagram', paper: 'Paper', github: 'GitHub', article: 'Article'};
+const KIND_NAME = {youtube: 'YouTube', instagram: 'Instagram', paper: 'Paper', github: 'GitHub', article: 'Article', subject: 'Subject'};
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36';
 const meta = (html, prop) => decode((html.match(new RegExp(`<meta[^>]+(?:property|name)="${prop}"[^>]+content="([^"]*)"`, 'i')) || html.match(new RegExp(`<meta[^>]+content="([^"]*)"[^>]+(?:property|name)="${prop}"`, 'i')) || [])[1] || '');
 async function linkContext(item) {
+  if (item.kind === 'subject' || !item.url) return {title: item.title || '', text: ''};
   const url = item.url; const kind = item.kind || 'article'; let title = item.title || '', text = '';
   if (kind === 'youtube') {
     const o = await safe('yt oembed', () => getJSON('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url)), null);
@@ -208,13 +209,14 @@ function kitPrompt(item, ctx, db) {
   const cats = Object.entries(db.categories || {}).map(([id, c]) => `${id}: ${c.name}`).join(', ');
   const tops = Object.values(db.topics || {}).map(t => t.title).slice(0, 250).join('; ');
   const text = [item.text, ctx.text].filter(Boolean).join('\n\n').slice(0, 16000);
-  return `Turn this ${KIND_NAME[item.kind] || 'link'} into a study kit for the learner.
-Link: ${item.url}\nTitle: ${ctx.title || item.title || '(unknown)'}\nLearner's note: ${item.note || '(none)'}
+  const subj = item.kind === 'subject';
+  const head = subj ? `The learner wants to study this subject from scratch: "${item.title}".\nBuild a complete, step-by-step learning path (6-10 steps from fundamentals to a small project, 5-8 sub-topics in learning order). Use what you know; for fast-moving tools say what to verify in the official docs.` : `Turn this ${KIND_NAME[item.kind] || 'link'} into a study kit for the learner.\nLink: ${item.url}\nTitle: ${ctx.title || item.title || '(unknown)'}`;
+  return `${head}\nLearner's note: ${item.note || '(none)'}
 Content text (transcript / caption / abstract / README; may be partial or empty):\n"""${text || '(not available: rely on the link, title and note; set confidence "low")'}"""
 Existing categories (id: name): ${cats}\nExisting topic titles: ${tops}
 Reply with only JSON:
-{"subject":"short title","cat":"existing category id or a short new category name","level":"Beginner|Intermediate|Advanced","confidence":"high|low","summary":"3-6 sentence Markdown summary","key_points":[{"t":"timestamp like 03:12 or empty","text":"..."}],"main_topic":"exact existing topic title if same subject, else a new concise topic title","topics":[{"title":"...","why":"...","parent":"exact existing title or null"}],"flashcards":[{"q":"...","a":"..."}],"exercise":"one hands-on task","plan":[{"t":"step","minutes":20,"how":"one line"}],"resources":[{"label":"...","url":"official docs, GitHub or arXiv URL you are certain exists"}],"video_search":["YouTube search query"]}
-Rules: 4-6 key points (use transcript timestamps when present), 2-5 related topics not already existing, 4-6 flashcards, 3-6 plan steps where step 1 is to watch/read the original.`;
+{"subject":"short title","cat":"existing category id or a short new category name","level":"Beginner|Intermediate|Advanced","confidence":"high|low","summary":"3-6 sentence Markdown summary","key_points":[{"t":"timestamp like 03:12 or empty","text":"..."}],"main_topic":"exact existing topic title if same subject, else a new concise topic title","topics":[{"title":"...","why":"...","parent":"exact existing title or null"}],"flashcards":[{"q":"...","a":"..."}],"exercise":"one hands-on task","plan":[{"t":"step","minutes":20,"how":"one line"}],"resources":[{"label":"...","url":"official docs, GitHub or arXiv URL you are certain exists"}],"video_search":["3-4 YouTube search queries"],"learn_next":[{"title":"follow-up subject","why":"one sentence"}]}
+Rules: also give exactly 3 learn_next subjects; 4-6 key points (use transcript timestamps when present), 2-5 related topics not already existing, 4-6 flashcards, 3-6 plan steps where step 1 is to watch/read the original.`;
 }
 const newId = s => slug(s).slice(0, 40) + '-' + Math.random().toString(36).slice(2, 6);
 function applyKit(db, item, kit, today) {
@@ -223,23 +225,23 @@ function applyKit(db, item, kit, today) {
     else if (cat) { const id = slug(cat).slice(0, 24); const n = Object.keys(cats).length; cats[id] ||= {name: clip(cat, 40), code: cat.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 4) || 'NEW', color: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#008300'][n % 8], order: n, updated: nowIso()}; cat = id; }
     else cat = Object.keys(cats)[0] || 'ai'; }
   const topics = (db.topics ||= {}); const find = t => Object.entries(topics).find(([, x]) => String(x.title).toLowerCase() === String(t || '').toLowerCase());
-  const orig = {label: `${KIND_NAME[item.kind] || 'Source'}: ${clip(kit.subject || item.url, 80)}`, url: item.url};
+  const orig = item.url ? {label: `${KIND_NAME[item.kind] || 'Source'}: ${clip(kit.subject || item.url, 80)}`, url: item.url} : null;
   const extra = cleanStep({links: kit.resources || [], video_search: kit.video_search || []}, new Set(), today).links;
   const cards = (kit.flashcards || []).filter(c => c && c.q && c.a).slice(0, 6).map(c => ({q: clip(c.q, 300), a: clip(c.a, 500)}));
   const summary = String(kit.summary || '').slice(0, 3000); const base = {notes: '', related: [], srs: null, chat: [], teach: null, log: [{d: today, a: 'added'}], created: nowIso(), updated: nowIso()};
   let mainId; const ex = find(kit.main_topic);
-  if (ex) { mainId = ex[0]; const t = ex[1]; const have = new Set((t.resources || []).map(r => r.url)); t.resources = [...(t.resources || []), ...[orig, ...extra].filter(r => !have.has(r.url)).map(r => ({label: r.label, url: r.url}))]; t.cards = [...(t.cards || []), ...cards]; if (!t.explain) t.explain = summary; t.updated = nowIso(); }
-  else { mainId = newId(kit.main_topic || kit.subject); topics[mainId] = {...base, title: clip(kit.main_topic || kit.subject, 90), cat, status: 'todo', source: 'me', priority: 2, parent: null, notes: item.note || '', explain: summary, cards, why: `From a ${KIND_NAME[item.kind] || 'link'} you sent`, resources: [orig, ...extra].map(r => ({label: r.label, url: r.url}))}; }
+  if (ex) { mainId = ex[0]; const t = ex[1]; const have = new Set((t.resources || []).map(r => r.url)); t.resources = [...(t.resources || []), ...[orig, ...extra].filter(r => r && !have.has(r.url)).map(r => ({label: r.label, url: r.url}))]; t.cards = [...(t.cards || []), ...cards]; if (!t.explain) t.explain = summary; t.updated = nowIso(); }
+  else { mainId = newId(kit.main_topic || kit.subject); topics[mainId] = {...base, title: clip(kit.main_topic || kit.subject, 90), cat, status: 'todo', source: 'me', priority: 2, parent: null, notes: item.note || '', explain: summary, cards, why: item.kind === 'subject' ? 'You asked to learn this' : `From a ${KIND_NAME[item.kind] || 'link'} you sent`, resources: [orig, ...extra].filter(Boolean).map(r => ({label: r.label, url: r.url})), ...(cards.length ? {kitReview: true, srs: {S: 3, D: 5, reps: 1, lapses: 0, last: today, due: addDays(today, 1), interval: 1}} : {})}; }
   const newTopics = [];
-  for (const r of (kit.topics || []).slice(0, 5)) { if (!r?.title || find(r.title)) continue; const p = find(r.parent); const id = newId(r.title);
-    topics[id] = {...base, title: clip(r.title, 90), cat, status: 'suggested', source: 'ai', priority: 2, parent: p ? p[0] : mainId, why: clip(r.why, 220), cards: [], explain: '', resources: []}; newTopics.push(id); }
-  const steps = (kit.plan || []).slice(0, 8).map((s, i) => ({id: 's' + (i + 1), t: clip(s.t || 'Step', 160), url: i === 0 ? item.url : '', dur: s.minutes ? `${Math.min(240, Math.max(5, +s.minutes || 20))}:00` : '', sec: '', done: false}));
+  for (const r of (kit.topics || []).slice(0, item.kind === 'subject' ? 8 : 5)) { if (!r?.title || find(r.title)) continue; const p = find(r.parent); const id = newId(r.title);
+    topics[id] = {...base, title: clip(r.title, 90), cat, status: item.kind === 'subject' ? 'todo' : 'suggested', source: 'ai', priority: 2, parent: p ? p[0] : mainId, why: clip(r.why, 220), cards: [], explain: '', resources: []}; newTopics.push(id); }
+  const steps = (kit.plan || []).slice(0, 10).map((s, i) => ({id: 's' + (i + 1), t: clip(s.t || 'Step', 160), url: i === 0 ? (item.url || '') : '', dur: s.minutes ? `${Math.min(240, Math.max(5, +s.minutes || 20))}:00` : '', sec: '', done: false}));
   if (kit.exercise) steps.push({id: 's' + (steps.length + 1), t: 'Exercise: ' + clip(kit.exercise, 150), url: '', dur: '', sec: '', done: false});
   const kp = (kit.key_points || []).slice(0, 8).map(k => ({t: clip(k.t, 10), text: clip(k.text, 300)}));
   const pathId = newId('kit ' + kit.subject);
-  (db.paths ||= {})[pathId] = {title: 'Study kit: ' + clip(kit.subject, 100), kind: 'kit', cat, url: item.url, source: 'me', steps, links: extra, notes: `${summary}\n\nKey points:\n${kp.map(k => `- ${k.t ? k.t + ' ' : ''}${k.text}`).join('\n')}`, inbox: item.id, created: nowIso(), updated: nowIso()};
+  (db.paths ||= {})[pathId] = {title: (item.kind === 'subject' ? 'Learning path: ' : 'Study kit: ') + clip(kit.subject, 100), kind: 'kit', cat, url: item.url || '', source: 'me', steps, links: extra, notes: `${summary}\n\nKey points:\n${kp.map(k => `- ${k.t ? k.t + ' ' : ''}${k.text}`).join('\n')}`, inbox: item.id, created: nowIso(), updated: nowIso()};
   Object.assign(item, {status: 'done', processedBy: 'bot', processed: today, error: null, updated: nowIso(),
-    kit: {subject: clip(kit.subject, 140), cat, level: kit.level || '', confidence: kit.confidence || '', summary, key_points: kp, exercise: clip(kit.exercise, 400), plan: steps.map(s => ({t: s.t, minutes: parseInt(s.dur) || 0}))},
+    kit: {subject: clip(kit.subject, 140), cat, level: kit.level || '', confidence: kit.confidence || '', summary, key_points: kp, exercise: clip(kit.exercise, 400), plan: steps.map(s => ({t: s.t, minutes: parseInt(s.dur) || 0})), videos: [], searches: (kit.video_search || []).slice(0, 4).map(q => clip(q, 120)), next: (kit.learn_next || []).filter(n => n?.title).slice(0, 3).map(n => ({title: clip(n.title, 100), why: clip(n.why, 160)}))},
     result: {topicId: mainId, pathId, newTopics}});
   return kit.subject;
 }
