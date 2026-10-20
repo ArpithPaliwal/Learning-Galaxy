@@ -126,7 +126,7 @@ const trusted = (u, extra) => /^https:\/\//.test(u || '') && (extra.has(u) || TR
 function cleanStep(s, extra, today) {
   const links = [];
   for (const q of (s.video_search || []).slice(0, 3)) if (q) links.push({label: 'YouTube: ' + clip(q, 80), url: 'https://www.youtube.com/results?search_query=' + encodeURIComponent(clip(q, 120)), by: 'ai'});
-  for (const l of (s.links || []).slice(0, 5)) if (l && trusted(String(l.url || ''), extra)) links.push({label: clip(l.label, 120), url: String(l.url), by: 'ai'});
+  for (const l of (s.links || []).slice(0, 5)) { const u = String(l?.url || ''); if (!/^https:\/\/\S+$/.test(u)) continue; const ok = trusted(u, extra); links.push({label: clip(l.label, 110) + (ok ? '' : ' (AI, check)'), url: u, by: 'ai'}); }
   return {id: 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: clip(s.t || 'New step', 140), summary: clip(s.summary, 600), do: clip(s.do, 600), links, done: false, notes: '', source: 'bot', added: today};
 }
 function applyTrackOps(track, out, extra, today) {
