@@ -3543,6 +3543,8 @@ ${meta.foreword ? meta.foreword + '\n\n' : ''}**At a glance**
 - ${learned.length} topics learned · ${learning.length} in progress · ${todo.length} to learn · ${sugg.length} suggested
 - ${solved.length}/${probs.length} DSA problems solved · ${fmtMin(minutes)} of focused study · ${done.length} thing${done.length===1?"":"s"} finished
 - ${[...C('projects').values()].filter(q=>q.status==='shipped').length} projects shipped · ${[...C('tracks').values()].reduce((s,t)=>s+(t.steps||[]).filter(z=>z.done).length,0)} Academy steps done · ${((n)=>n+' research dossier'+(n===1?'':'s'))([...C('research').values()].filter(r=>r.dossier).length)}`});
+  const LIB = [...C('inbox').values()].sort((a,b)=>String(b.at||b.added).localeCompare(String(a.at||a.added))); const TOOLS = [...C('tools').values()].sort((a,b)=>String(b.at||b.added).localeCompare(String(a.at||a.added)));
+  ch[0].md += `\n- ${LIB.length} item${LIB.length===1?'':'s'} in my Library (${LIB.filter(i=>i.status==='done').length} built) · ${TOOLS.length} tool${TOOLS.length===1?'':'s'} in my Toolbox (${TOOLS.filter(t=>t.status==='keep').length} kept)\n`;
   // 1. Map
   ch.push({id:'map', title:'Chapter 1 · My knowledge map', md: cats.map(c => { const ts = T.filter(t=>t.cat===c.id && t.status!=='suggested'); const l = ts.filter(t=>t.status==='learned').length;
     return `## ${c.name}\n${l}/${ts.length} learned${ts.length?` (${Math.round(l/ts.length*100)}%)`:''}\n${ts.sort((a,b)=>({learned:0,learning:1,todo:2}[a.status]??3)-({learned:0,learning:1,todo:2}[b.status]??3)).map(t=>`- ${t.status==='learned'?'[x]':t.status==='learning'?'[~]':'[ ]'} ${t.title}`).join('\n')}`; }).join('\n\n') });
@@ -3560,6 +3562,25 @@ ${meta.foreword ? meta.foreword + '\n\n' : ''}**At a glance**
     (() => { const ts = [...C('tracks').values()].filter(t=>(t.steps||[]).some(s=>s.done) && (t.steps||[]).some(s=>!s.done)); return ts.length ? `## Academy tracks in progress\n${ts.map(t=>`- **${t.title}** ${(t.steps||[]).filter(s=>s.done).length}/${(t.steps||[]).length} · next: ${(t.steps||[]).find(s=>!s.done)?.t||''}`).join('\n')}` : ''; })(),
     (() => { const ps = [...C('projects').values()].filter(q=>q.status==='building'); return ps.length ? `## Building\n${ps.map(q=>`- **${q.title}** ${projProgress(q).done}/${projProgress(q).total} milestones · next: ${projProgress(q).next?.t||'—'}`).join('\n')}` : ''; })()
   ].filter(Boolean).join('\n\n') || '_Nothing in progress._' });
+  // Library: everything saved (links and subjects), newest first, by category
+  const libItem = i => { const k = i.kit || {}; const r = i.result || {}; const pth = r.pathId ? C('paths').get(r.pathId) : null; const pr = pth ? pathProgress(pth) : null;
+    return `### ${k.subject || i.title || i.url}\n*${(L.KIND_NAME||{})[i.kind] || 'Link'} · saved ${dt(i.added)}${k.level ? ' · '+k.level : ''}${pr ? ` · path ${pr.done}/${pr.total}` : ''}${i.url ? ' · '+link({label:'source', url:i.url}) : ''}*\n\n` +
+      (i.note ? `> ${strip(i.note)}\n\n` : '') + (k.summary ? first(k.summary, 900) + '\n\n' : '') +
+      ((k.key_points||[]).length ? `**Key points**\n${k.key_points.map(x=>`- ${x.t?x.t+' ':''}${x.text}`).join('\n')}\n\n` : '') +
+      (pth && (pth.steps||[]).length ? `**Path**\n${pth.steps.map(z=>`- ${z.done?'[x]':'[ ]'} ${z.t}`).join('\n')}\n\n` : '') +
+      ((k.videos||[]).length ? `**Videos:** ${k.videos.map(v=>link({label:v.title, url:v.url})).join(' · ')}\n\n` : ((k.searches||[]).length ? `**Videos to look up:** ${k.searches.join(' · ')}\n\n` : '')) +
+      ((k.next||[]).length ? `**Learn next:** ${k.next.map(n=>n.title).join(' · ')}\n` : ''); };
+  const builtLib = LIB.filter(i=>i.status==='done' && i.kit); const waitLib = LIB.filter(i=>i.status!=='done' || !i.kit);
+  ch.push({id:'mylib', title:'Chapter 0 · My Library', md: [
+    builtLib.length ? sortedCats().map(c => { const xs = builtLib.filter(i=>i.kit.cat===c.id); return xs.length ? `## ${c.name}\n\n${xs.map(libItem).join('\n')}` : ''; }).filter(Boolean).join('\n\n') + (() => { const other = builtLib.filter(i=>!C('categories').has(i.kit.cat)); return other.length ? `\n\n## Other\n\n${other.map(libItem).join('\n')}` : ''; })() : '',
+    waitLib.length ? `## Waiting to be built\n${waitLib.map(i=>`- ${i.title || i.url}${i.url && i.title ? ' — '+link({label:'link', url:i.url}) : ''} (saved ${dt(i.added)})`).join('\n')}` : ''
+  ].filter(Boolean).join('\n\n') || '_Nothing saved yet. Paste a link or type a subject on the Library page._' });
+  // Toolbox
+  const TSTAT = {totry:'To try', trying:'Trying', tried:'Tried', keep:'Keeping', drop:'Dropped'};
+  ch.push({id:'toolbox', title:'Chapter 0 · My Toolbox', md: Object.keys(TSTAT).map(st => { const xs = TOOLS.filter(t=>(t.status||'totry')===st); return xs.length ? `## ${TSTAT[st]}\n\n` + xs.map(t =>
+    `### ${t.url ? link({label:t.name, url:t.url}) : t.name}\n${[t.pricing, (t.tags||[]).join(', ')].filter(Boolean).map(x=>'*'+x+'*').join(' · ')}\n\n${t.what ? first(t.what, 700)+'\n\n' : ''}` +
+    ((t.needs||[]).length ? `**Needs:** ${t.needs.join('; ')}\n\n` : '') + (t.start ? `**Try it:** \`${t.start}\`\n\n` : '') +
+    ((t.links||[]).length ? `**Links:** ${t.links.map(link).join(' · ')}\n\n` : '') + (t.notes ? `**My notes:** ${strip(t.notes)}\n` : '')).join('\n') : ''; }).filter(Boolean).join('\n\n') || '_No tools yet. Tap ⚒ Save to Toolbox on anything._' });
   // 4. What to learn next
   const gaps = (L.findGaps ? L.findGaps() : []).map(g => g.text.replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').replace(/&#39;/g,"'").replace(/&quot;/g,'"'));
   ch.push({id:'next', title:'Chapter 4 · What to learn next', md: [
@@ -3602,7 +3623,9 @@ ${meta.foreword ? meta.foreword + '\n\n' : ''}**At a glance**
   for (const t of T) for (const r of (t.resources||[])) addL(t.cat, r, t.title);
   for (const tr of C('tracks').values()) for (const s of (tr.steps||[])) for (const l of (s.links||[])) addL(tr.cat||'ai', l, tr.title);
   for (const q of C('paths').values()) for (const l of (q.links||[])) addL(q.cat, l, q.title);
+  for (const t of C('tools').values()) for (const l of (t.links||[])) addL(sortedCats()[0]?.id, l, 'Toolbox: '+t.name);
   ch.push({id:'library', title:'Appendix B · Resource library', md: sortedCats().map(c => { const ls = libs.filter(x=>x.cat===c.id); return ls.length ? `## ${c.name}\n${ls.map(x=>`- ${link(x.l)} — ${x.from}`).join('\n')}` : ''; }).filter(Boolean).join('\n\n') || '_No links yet._' });
+  let n = 0; ch.forEach(c => { if (/^Chapter \d+ ·/.test(c.title)) c.title = c.title.replace(/^Chapter \d+/, 'Chapter '+(++n)); });
   return ch;
 }
 function bookMarkdown(){ const p = profile(); return `# ${p.name ? p.name + "'s" : 'My'} Learning Galaxy Book\n\n` + chapters().map(c => `# ${c.title}\n\n${c.md}`).join('\n\n---\n\n') + '\n'; }
@@ -3646,6 +3669,10 @@ function snapshot(){ // keep a copy in the database so Claude's weekly run can f
   if (!S.db || S.canWrite===false) return; clearTimeout(snapT); snapT = setTimeout(() => { const m = bookMarkdown().slice(0, 200000); const meta = C('meta').get('book') || {};
     if (meta.markdown === m) return; const body = Object.assign({}, meta, {markdown:m, generated:nowIso()}); delete body.id; put('meta', 'book', body); }, 2500);
 }
+/* keep the saved book fresh every day and after changes, even when the Book page is closed */
+setTimeout(() => snapshot(), 8000);
+setInterval(() => { if (!document.hidden) snapshot(); }, 600000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(snapshot, 4000); });
 async function foreword(btn){
   btn.disabled = true; btn.textContent = 'Writing…'; $('#v-book').__busy = true;
   try { const ch = chapters().filter(c=>['map','learned','now','next','timeline'].includes(c.id)).map(c=>`# ${c.title}\n${c.md}`).join('\n\n').slice(0, 14000);
