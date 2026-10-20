@@ -401,8 +401,22 @@ function mdToTxt(m) {
   return m.replace(/^---$/gm, '\u0000HR').replace(/^#\s+(.*)$/gm, (_, t) => `\n${t.toUpperCase()}\n${'='.repeat(Math.min(70, t.length))}`).replace(/^##\s+(.*)$/gm, (_, t) => `\n${t}\n${'-'.repeat(Math.min(70, t.length))}`).replace(/^###\s+(.*)$/gm, '\n$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1$2').replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:)!?]|$)/gm, '$1$2').replace(/`([^`\n]+)`/g, '$1').replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '$1 <$2>').replace(/^\u0000HR$/gm, '\n' + '~'.repeat(40) + '\n').replace(/\n{3,}/g, '\n\n');
 }
+/* things the bot built after the app last rebuilt the book (so Notion / Drive stay current even if the app was not opened) */
+function bookAddendum(db, md) {
+  const since = (md.match(/generated (\d{4}-\d{2}-\d{2})/) || [])[1] || ''; if (!since) return '';
+  const fresh = (title, d) => title && String(d || '') >= since && !md.includes(String(title));
+  const kits = Object.values(db.inbox || {}).filter(i => i.status === 'done' && i.kit && fresh(i.kit.subject, i.processed));
+  const tools = Object.values(db.tools || {}).filter(t => fresh(t.name, t.enriched || t.added));
+  const rs = Object.values(db.research || {}).filter(r => r.dossier && fresh(r.dossier.title || r.query, r.researched || r.drafted));
+  if (!kits.length && !tools.length && !rs.length) return '';
+  return '\n\n---\n\n# New since ' + since + '\n\n' +
+    (kits.length ? '## Library\n\n' + kits.map(i => `### ${i.kit.subject}\n${clip(i.kit.summary, 900)}\n\n${(i.kit.key_points || []).map(k => '- ' + k.text).join('\n')}${i.url ? '\n\nSource: ' + i.url : ''}`).join('\n\n') + '\n\n' : '') +
+    (tools.length ? '## Toolbox\n\n' + tools.map(t => `### ${t.name}\n${clip(t.what, 700)}${(t.needs || []).length ? '\n\nNeeds: ' + t.needs.join('; ') : ''}${t.start ? '\n\nTry it: ' + t.start : ''}${(t.links || []).length ? '\n\nLinks: ' + t.links.map(l => l.url).join(' · ') : ''}`).join('\n\n') + '\n\n' : '') +
+    (rs.length ? '## Research\n\n' + rs.map(r => `### ${r.dossier.title || r.query}\n${clip(r.dossier.summary, 700)}`).join('\n\n') + '\n' : '');
+}
 async function syncBook(db) {
-  const md = (await safe('book file', () => gistFile('learning-galaxy-book.md'), '')) || db.meta?.book?.markdown || '';
+  let md = (await safe('book file', () => gistFile('learning-galaxy-book.md'), '')) || db.meta?.book?.markdown || '';
+  if (md) md += bookAddendum(db, md);
   if (!md) { log('book: no learning-galaxy-book.md in the gist yet (open the app once with auto-sync on)'); return ''; }
   const sync = (db.meta.bookSync ||= {}); const title = `${db.meta?.profile?.name || 'My'} Learning Galaxy Book`; const did = [];
   if (env.NOTION_TOKEN && env.NOTION_PAGE_ID) { const ok = await safe('notion', async () => { await bookToNotion(md, sync, title); return true; }, false); if (ok) did.push('Notion'); }
@@ -595,10 +609,11 @@ export async function main() {
   }
   if (doWeekly) { weeklyMsg = await safe('weekly', () => weeklyReport(db, today), '');
     const rw = await safe('research refresh', () => processResearch(db, today, {weekly: true}), []); if (rw.length) log('research refreshed: ' + rw.join(', ')); }
-  if (doWeekly || doBook) { bookMsg = await safe('book', () => syncBook(db), ''); if (bookMsg) log('book saved to ' + bookMsg); }
+  const bookDest = (env.NOTION_TOKEN && env.NOTION_PAGE_ID) || (env.GDRIVE_CLIENT_ID && env.GDRIVE_REFRESH_TOKEN);
+  if (doWeekly || doBook || (doMorning && bookDest)) { bookMsg = await safe('book', () => syncBook(db), ''); if (bookMsg) log('book saved to ' + bookMsg); }
   Object.assign(refresh, {lastRun: nowIso(), lastDigest: morningMsg || refresh.lastDigest || '', bot: 'github-action', updated: nowIso()});
   await saveGist(store);
-  if (morningMsg) await notify('Learning Galaxy · today', morningMsg);
+  if (morningMsg) await notify('Learning Galaxy · today', morningMsg + (bookMsg && !weeklyMsg ? `\nYour book is updated in ${bookMsg}.` : ''));
   if (weeklyMsg) await notify('Learning Galaxy · weekly report', weeklyMsg + (bookMsg ? `\nYour book is updated in ${bookMsg}.` : ''));
   else if (doBook && bookMsg) await notify('Learning Galaxy · book', `Your book is updated in ${bookMsg}.`);
   log('done', morningMsg ? '\n' + morningMsg : '', weeklyMsg);
