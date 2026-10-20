@@ -246,6 +246,33 @@ function applyKit(db, item, kit, today) {
     result: {topicId: mainId, pathId, newTopics}});
   return kit.subject;
 }
+/* ---------------- Toolbox: fill in what a saved tool does, needs and its links ---------------- */
+async function processTools(db, today) {
+  const done = [];
+  for (const [id, t] of Object.entries(db.tools || {})) {
+    if (t.enrich !== 'pending' || done.length >= 8) continue;
+    try {
+      let ghi = null; const m = String(t.url || '').match(/github\.com\/([^/]+)\/([^/#?]+)/);
+      if (m) { const r = await safe('tool repo', () => gh(`/repos/${m[1]}/${m[2].replace(/\.git$/, '')}`), null);
+        if (r) { const readme = await safe('tool readme', () => getText(`https://api.github.com/repos/${r.full_name}/readme`, {headers: {authorization: 'Bearer ' + env.GIST_TOKEN, accept: 'application/vnd.github.raw'}}), '');
+          ghi = {url: r.html_url, homepage: r.homepage || '', stars: r.stargazers_count || 0, license: r.license?.spdx_id || '', lang: r.language || '', topics: r.topics || [], desc: r.description || '', readme: String(readme).slice(0, 6000)}; } }
+      const o = await llm(`Describe this tool for a learner who wants to try it and decide if it is useful.
+Tool: ${t.name}${t.url ? '\nLink: ' + t.url : ''}${t.what ? '\nKnown description: ' + t.what : ''}
+${ghi ? `GitHub: ${ghi.url} · ${ghi.stars} stars · license ${ghi.license || 'unknown'}\nREADME (partial):\n"""${ghi.readme}"""` : ''}
+If the link is a video or article about a tool, describe the tool itself.
+Reply with only JSON: {"name":"real name","what":"2-4 plain sentences","needs":["each requirement"],"pricing":"Free | Open source (license) | Free tier + paid | Paid","start":"first command or step","links":[{"label":"Website | Docs | Quickstart | GitHub","url":"official URLs you are certain exist"}],"tags":["2-5 tags"],"alternatives":["up to 3 similar tools"]}`, {json: true, max: 1500});
+      if (!o?.what) throw new Error('no description');
+      const links = [...(t.links || [])]; const add = (label, url) => { if (url && /^https:\/\//.test(url) && !links.some(l => l.url === url)) links.push({label: clip(label, 40), url}); };
+      if (ghi) { add('GitHub', ghi.url); if (ghi.homepage) add('Website', /^https?:/.test(ghi.homepage) ? ghi.homepage : 'https://' + ghi.homepage); }
+      for (const l of (o.links || []).slice(0, 8)) add(String(l?.label || 'Link') + ' (AI, check)', String(l?.url || ''));
+      Object.assign(t, {name: clip(o.name || t.name, 120), what: clip(o.what, 900), needs: (o.needs || []).map(x => clip(x, 140)).slice(0, 8), pricing: clip(o.pricing, 80), start: clip(o.start, 300), links,
+        tags: (t.tags || []).length ? t.tags : (o.tags || (ghi ? ghi.topics : [])).map(x => clip(x, 30)).slice(0, 6), alternatives: (o.alternatives || []).map(x => clip(x, 60)).slice(0, 3),
+        url: t.url || (links.find(l => !/check|Where I saw/.test(l.label)) || {}).url || '', meta: ghi ? {stars: ghi.stars, license: ghi.license, lang: ghi.lang} : t.meta, enrich: 'done', enriched: today, updated: nowIso()});
+      done.push(t.name);
+    } catch (e) { log('tool ' + t.name + ': ' + e.message); }
+  }
+  return done;
+}
 async function processInbox(db, today) {
   const done = [];
   for (const [id, item] of Object.entries(db.inbox || {})) {
@@ -557,6 +584,7 @@ export async function main() {
     const imported = await safe('imports', () => processImports(db, today), 0);
     const kits = await safe('inbox', () => processInbox(db, today), []); if (kits.length) log('study kits: ' + kits.join(', '));
     researched = await safe('research', () => processResearch(db, today), []); if (researched.length) log('research: ' + researched.join(', '));
+    const toolsDone = await safe('tools', () => processTools(db, today), []); if (toolsDone.length) log('toolbox: ' + toolsDone.join(', '));
     const r = await safe('news', () => refreshNews(db, today), {added: 0, suggested: 0, pruned: []});
     refresh.pruned = [...(r.pruned || []), ...(refresh.pruned || [])].slice(0, 300);
     const ac = await safe('academy', () => updateAcademy(db, today), 0); log(`academy changes: ${ac}`);
