@@ -453,6 +453,7 @@ body.display .dhud{display:block}
         <button data-view="today"><span class="ic">☀</span>Today</button>
         <button data-view="galaxy"><span class="ic">✺</span>Galaxy</button>
         <button data-view="library"><span class="ic">▤</span>Library<b class="badge" id="libBadge" hidden style="background:var(--good)">0</b></button>
+        <button data-view="toolbox"><span class="ic">⚒</span>Toolbox<b class="badge" id="toolBadge" hidden style="background:var(--gold)">0</b></button>
         <button data-view="inbox"><span class="ic">⇣</span>Inbox<b class="badge" id="inboxBadge" hidden style="background:var(--warn)">0</b></button>
         <button data-view="trending"><span class="ic">↗</span>Trending</button>
         <button data-view="research"><span class="ic">⌕</span>Research<b class="badge" id="researchBadge" hidden style="background:var(--accent)">0</b></button>
@@ -594,6 +595,14 @@ body.display .dhud{display:block}
         <div class="grid-2" style="margin-bottom:14px"><div class="panel"><h3>This week <button class="btn small ghost" id="lbCopy" style="margin-left:auto">Copy digest</button></h3><div id="lbDigest" class="stack" style="gap:8px"></div></div><div class="panel"><h3>Learn next</h3><div id="lbNext" class="chips"></div></div></div>
         <div class="row" style="margin-bottom:10px"><input class="inp" id="lbSearch" type="search" placeholder="Search your library" style="max-width:320px"><div class="chips" id="lbKinds"></div></div>
         <div id="lbList" class="stack" style="gap:8px"></div>
+      </section>
+
+      <!-- TOOLBOX -->
+      <section id="v-toolbox" class="view" hidden>
+        <div class="view-head"><div><div class="eyebrow">Toolbox</div><h2>Tools to try</h2><p>Everything you saved with ⚒ Save to Toolbox, from your Library, Inbox, News, Trending or Research. Each one says what it does, what it needs and its key links. Mark them as you try them.</p></div></div>
+        <div class="panel" style="margin-bottom:14px"><div class="row" style="gap:8px;flex-wrap:nowrap"><input class="inp" id="tbAdd" placeholder="Paste a tool's link (GitHub, website) or type its name" style="flex:1;min-width:0"><button class="btn primary" id="tbGo">Save tool</button></div></div>
+        <div class="row" style="margin-bottom:10px"><input class="inp" id="tbSearch" type="search" placeholder="Search your tools" style="max-width:320px"><div class="chips" id="tbStatus"></div></div>
+        <div id="tbList" class="cardgrid"></div>
       </section>
 
       <!-- INBOX -->
@@ -819,7 +828,7 @@ const PROJ_STATUS = {idea:{label:'Idea', color:'#9aa3c7'}, building:{label:'Buil
 const A2Z = ['Learn the basics','Sorting techniques','Arrays','Binary search','Strings','Linked list','Recursion & backtracking','Bit manipulation','Stack & queue','Sliding window & two pointers','Heaps','Greedy','Binary trees','Binary search trees','Graphs','Dynamic programming','Tries','Advanced strings','Extras'];
 const XP = {topic:50, step:15, path:150, milestone:40, project:250, problem:{Easy:20, Medium:35, Hard:60}, custom:25, reflection:10, review:10, lesson:20, track:200, task:25};
 const LEVELS = ['Stargazer','Spotter','Navigator','Cartographer','Astronomer','Pathfinder','Voyager','Constellation maker','Nebula architect','Galaxy engineer'];
-const COLS = ['categories','topics','paths','projects','problems','done','sessions','plans','interviews','news','imports','reports','meta','tracks','inbox','trends','research','tasks'];
+const COLS = ['categories','topics','paths','projects','problems','done','sessions','plans','interviews','news','imports','reports','meta','tracks','inbox','trends','research','tasks','tools'];
 const CLAUDE_REMOTE = 'Claude Code Remote';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1130,14 +1139,14 @@ const controllers = new Set(); function abortAll(){ controllers.forEach(c => c.a
 function debounceSave(key, fn, ms=900){ let t; const run = () => { clearTimeout(t); pendingSavers.delete(run); fn(); }; return () => { clearTimeout(t); pendingSavers.add(run); t = setTimeout(run, ms); }; }
 
 /* ================= navigation & render scheduling ================= */
-const TITLES = {book:'My book', research:'Research', tasks:'Tasks', library:'Library', inbox:'Inbox', trending:'Trending', academy:'AI Academy', today:'Today', galaxy:'Galaxy', bucket:'Bucket', paths:'Paths', review:'Review', dsa:'DSA · Striver A2Z', forge:'Forge', practice:'Mock interviews', done:'Done wall', progress:'Progress', news:'News', powers:'All powers', settings:'Settings'};
+const TITLES = {book:'My book', research:'Research', tasks:'Tasks', library:'Library', toolbox:'Toolbox', inbox:'Inbox', trending:'Trending', academy:'AI Academy', today:'Today', galaxy:'Galaxy', bucket:'Bucket', paths:'Paths', review:'Review', dsa:'DSA · Striver A2Z', forge:'Forge', practice:'Mock interviews', done:'Done wall', progress:'Progress', news:'News', powers:'All powers', settings:'Settings'};
 function setView(v){
   if (!TITLES[v]) v = 'today'; S.view = v; LS.set('view', v);
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.view===v));
   $$('.view').forEach(s => s.hidden = s.id !== 'v-'+v);
   $('#viewTitle').textContent = TITLES[v];
   $('#searchWrap').hidden = v!=='galaxy';
-  $('#filters').hidden = ['settings','powers','practice','library','inbox','trending','research','tasks','book'].includes(v);
+  $('#filters').hidden = ['settings','powers','practice','library','toolbox','inbox','trending','research','tasks','book'].includes(v);
   document.body.classList.remove('rail-open'); $('#railScrim').hidden = true;
   if (v==='galaxy') setTimeout(() => window.__LG?.resizeGraph?.(), 30);
   render(); window.scrollTo({top:0});
@@ -2401,7 +2410,7 @@ renderers.push(function newsView(){
     return `<article class="bigcard" style="cursor:default"><div class="meta"><span class="kind">${esc(KINDS[n.kind]||n.kind)}</span>${c?`<span class="dot" style="--c:${esc(c.color)}"></span><span>${esc(c.name)}</span>`:''}<span>· ${esc(n.source||'')}</span><span style="margin-left:auto">${esc(relDate(n.date))}</span></div>
       <h4 style="font:600 15.5px/1.3 var(--f-body)"><a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener" style="color:var(--fg);text-decoration:none">${esc(n.title)}</a></h4>${n.summary?`<p style="margin:0;color:var(--fg-2);font-size:13.5px">${esc(n.summary)}</p>`:''}
       ${why?`<div class="aibox">${md(why)}</div>`:''}
-      <div class="tc-act" style="margin-top:auto">${saved ? `<button class="btn small ghost" data-open="topic:${esc(n.savedTopic)}">In your bucket</button>` : `<button class="btn small w" data-save="${esc(n.id)}">Save to bucket</button>`}${ai && !why?`<button class="btn small ghost" data-why="${esc(n.id)}">Why it matters to me</button>`:''}</div></article>`; }).join('')
+      <div class="tc-act" style="margin-top:auto">${saved ? `<button class="btn small ghost" data-open="topic:${esc(n.savedTopic)}">In your bucket</button>` : `<button class="btn small w" data-save="${esc(n.id)}">Save to bucket</button>`}${ai && !why?`<button class="btn small ghost" data-why="${esc(n.id)}">Why it matters to me</button>`:''}${L.toolBtn ? L.toolBtn({name:n.title, url:n.url, desc:n.summary, from:'News'}) : ''}</div></article>`; }).join('')
     : `<div class="empty">${S.onlyMine ? '"Only mine" is on, so only news you saved shows here.' : 'No news here yet. Claude adds new items every morning.'}</div>`;
   const m = C('meta').get('refresh') || {};
   $('#lastRefresh').textContent = m.lastRun ? `Last refreshed ${relDate(String(m.lastRun).slice(0,10))}` : 'Refreshes every morning';
@@ -2630,7 +2639,7 @@ function openLinksModal(title, links, save){
   openModal(`<h3>Links · ${esc(title)}</h3><div id="lmBody"></div><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="lmCancel">Cancel</button><button class="btn primary" id="lmSave">Save</button></div>`, () => {
     draw(); $('#lmCancel').onclick = closeModal; $('#lmSave').onclick = () => { save(cur); closeModal(); toast('Links saved.'); }; });
 }
-L.linksHtml = linksHtml; L.wireLinks = wireLinks; L.openLinksModal = openLinksModal; L.isVid = isVid; L.ytSearch = ytSearch;
+L.linksHtml = linksHtml; L.wireLinks = wireLinks; L.openLinksModal = openLinksModal; L.isVid = isVid; L.ytSearch = ytSearch; setTimeout(() => { L.trustedUrl = trustedUrl; }, 0);
 
 /* ---------- AI link safety: only trusted hosts, news urls, or YouTube searches ---------- */
 const TRUSTED = ['youtube.com','youtu.be','anthropic.com','docs.anthropic.com','docs.claude.com','openai.com','platform.openai.com','cookbook.openai.com','learn.microsoft.com','devblogs.microsoft.com','azure.microsoft.com','huggingface.co','github.com','arxiv.org','modelcontextprotocol.io','deeplearning.ai','pytorch.org','docs.vllm.ai','ollama.com','docs.pipecat.ai','docs.livekit.io','python.langchain.com','langchain-ai.github.io','docs.llamaindex.ai','ai.google.dev','cloud.google.com','aws.amazon.com','docs.unsloth.ai','hamel.dev','promptingguide.ai','karpathy.ai','developer.nvidia.com','docs.mistral.ai','kaggle.com','colab.research.google.com','fast.ai','course.fast.ai','datacamp.com'];
@@ -3191,7 +3200,7 @@ function kitCard(i, ai){
   const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
   if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
     ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${i.status==='processing' ? 'Building now…' : (i.botAsked && Date.now()-Date.parse(i.botAsked) < 900000) ? 'Your GitHub bot was started '+esc(relDate(String(i.botAsked).slice(0,10)))+' at '+esc(new Date(i.botAsked).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}))+'. Results appear here in 2 to 4 minutes.' : IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : useBrowser() ? 'Starts building in a few seconds.' : botOK() ? 'Waiting for your GitHub bot. Tap Run bot now to start it right away.' : ai ? 'Tap Build now.' : 'Not built yet: this browser has no AI turned on and the bot is not connected. Tap Build now to set it up.'}</p>`}
-    <div class="row w" style="gap:6px">${useBrowser()?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(botOK()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>${ai?`<button class="btn small ghost" data-ibact="build" data-id="${esc(i.id)}">Build here instead</button>`:''}`:(ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`))}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${useBrowser()?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(botOK()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>${ai?`<button class="btn small ghost" data-ibact="build" data-id="${esc(i.id)}">Build here instead</button>`:''}`:(ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`))}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}${L.toolBtn ? L.toolBtn({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
   const pr = pth ? L.pathProgress(pth) : null;
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
@@ -3201,7 +3210,7 @@ function kitCard(i, ai){
     ${pth?`<div><span class="flabel">Study plan · ${pr.done}/${pr.total}</span><ol class="kp">${(pth.steps||[]).map(s=>`<li style="${s.done?'text-decoration:line-through;color:var(--fg-3)':''}">${esc(s.t)}${s.dur?` <span class="faint mono" style="font-size:11.5px">${esc(s.dur.replace(':00',''))}m</span>`:''}</li>`).join('')}</ol></div>`:''}
     ${videosHtml(k)}
     ${pth && (pth.links||[]).filter(l=>!/youtube\.com\/watch/.test(l.url)).length?`<div><span class="flabel">Resources</span><div class="chips">${pth.links.filter(l=>!/youtube\.com\/watch/.test(l.url)).map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
-    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${(ai||(L.botReady&&L.botReady()))?`<button class="btn small ghost" data-ibact="again" data-id="${esc(i.id)}" title="Rebuild this from scratch. Your progress on the steps is kept.">Do it again</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${(ai||(L.botReady&&L.botReady()))?`<button class="btn small ghost" data-ibact="again" data-id="${esc(i.id)}" title="Rebuild this from scratch. Your progress on the steps is kept.">Do it again</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}${L.toolBtn ? L.toolBtn({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
 }
 L.kitCard = kitCard;
 $('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
@@ -3235,10 +3244,10 @@ renderers.push(function trendingView(){
   const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : String(n||0);
   const inInbox = new Set([...C('inbox').values()].map(i=>i.url));
   $('#trRepos').innerHTML = rl.slice(0,25).map(r => `<div class="trow"><div style="min-width:0"><h5><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">${esc(r.name)}</a></h5>${r.desc?`<p>${esc(r.desc)}</p>`:''}<div class="meta">${r.lang?`<span>${esc(r.lang)}</span>`:''}${r.stars?`<span>★ ${fmtK(r.stars)}</span>`:''}${r.today?`<span style="color:var(--gold)">+${fmtK(r.today)} today</span>`:''}${tr.period==='week'&&r.days>1?`<span>trending ${r.days} days</span>`:''}</div></div>
-    <div class="acts">${inInbox.has(r.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(r.url)}" data-trnote="${esc(r.desc||'')}" data-trtitle="${esc(r.name)}">Study kit</button>`}</div></div>`).join('') || '<p class="empty">No repos for this filter.</p>';
+    <div class="acts">${inInbox.has(r.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(r.url)}" data-trnote="${esc(r.desc||'')}" data-trtitle="${esc(r.name)}">Study kit</button>`}${L.toolBtn ? L.toolBtn({name:r.name, url:r.url, desc:r.desc, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">No repos for this filter.</p>';
   const ai = new Map(); for (const s of use) for (const x of (s.ai||[])) if (!ai.has(x.url)) ai.set(x.url, Object.assign({day:s.date||s.id}, x));
   $('#trAi').innerHTML = [...ai.values()].slice(0,25).map(x => `<div class="trow"><div style="min-width:0"><div class="meta" style="margin:0 0 4px"><span class="kind">${esc(x.kind||'news')}</span><span>${esc(x.source||'')}</span>${tr.period==='week'?`<span>${esc(relDate(x.day))}</span>`:''}</div><h5><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a></h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}</div>
-    <div class="acts">${inInbox.has(x.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(x.url)}" data-trnote="${esc(x.summary||'')}" data-trtitle="${esc(x.title)}">Study kit</button>`}</div></div>`).join('') || '<p class="empty">Nothing yet.</p>';
+    <div class="acts">${inInbox.has(x.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(x.url)}" data-trnote="${esc(x.summary||'')}" data-trtitle="${esc(x.title)}">Study kit</button>`}${L.toolBtn ? L.toolBtn({name:x.title, url:x.url, desc:x.summary, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">Nothing yet.</p>';
 });
 document.addEventListener('click', e => { const b = e.target.closest('[data-trkit]'); if (!b) return; b.disabled = true;
   addToInbox({url:b.dataset.trkit, note:b.dataset.trnote, title:b.dataset.trtitle, text:b.dataset.trnote, now:aiOK(), tier:'smart'}); });
@@ -3357,7 +3366,7 @@ function drawDossier(root, r){
   const d = r.dossier; const ai = aiOK(); const pill = STATUS_PILL[r.working?'improve':r.status] || STATUS_PILL.pending;
   const haveTitles = new Set([...C('topics').values()].map(t=>t.title.toLowerCase())); const taskTitles = new Set([...C('tasks').values()].map(t=>t.title.toLowerCase()));
   root.innerHTML = `<div class="view-head"><div><button class="btn small ghost" id="rsBack">← All research</button><div class="eyebrow" style="margin-top:12px">${esc(MODES[r.mode]||'Learn it')} · requested ${esc(relDate(r.added))}${r.researchedBy?` · researched by ${esc(r.researchedBy)}`:''}</div><h2>${esc(d?.title || r.query)}</h2>${d?.summary?`<p>${esc(d.summary)}</p>`:''}</div>
-      <div class="row"><span class="pill" style="--c:${pill[1]}">${r.working?'Working…':pill[0]}</span><label class="switch" title="Re-check weekly for what's new"><input type="checkbox" id="rsWatch" ${r.watch?'checked':''}><span>Keep updated</span></label></div></div>
+      <div class="row">${L.toolBtn ? L.toolBtn({name:d?.title || r.query, url:(d?.resources||[]).map(x=>x&&x.url).find(u => /^https:/.test(u||'')) || '', desc:d?.summary || '', from:'Research'}) : ''}<span class="pill" style="--c:${pill[1]}">${r.working?'Working…':pill[0]}</span><label class="switch" title="Re-check weekly for what's new"><input type="checkbox" id="rsWatch" ${r.watch?'checked':''}><span>Keep updated</span></label></div></div>
     ${!d ? `<div class="panel"><p class="muted" style="margin:0">${r.status==='failed' ? esc(r.error||'Research failed.') : IN_CLAUDE ? 'Claude researches this on the web tonight. It will be here in the morning.' : 'Your bot researches this on its next run.'}</p>${ai?`<div class="row" style="margin-top:10px"><span class="ai-row"><button class="btn small primary" id="rsDraftOne">Draft now with AI</button>${tierHtml('rsTier1')}</span></div>`:''}${!ai && L.botReady && L.botReady() ? `<div class="row" style="margin-top:10px"><button class="btn small primary" id="rsBotNow">Research now (bot)</button></div>` : ''}</div>` : `
     <div class="grid-2" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
       <div class="stack">
@@ -3843,6 +3852,164 @@ $('#lbAdd').addEventListener('paste', () => setTimeout(() => { const v = $('#lbA
 $('#lbSearch').addEventListener('input', e => { lb.q = e.target.value; render(); });
 $('#lbCopy').onclick = async () => { const t = digestText(digest()); try { await navigator.clipboard.writeText(t); toast('Digest copied.'); } catch(e){ openModal(`<h3>Weekly digest</h3><textarea class="inp" style="min-height:160px" readonly>${esc(t)}</textarea><div class="row" style="justify-content:flex-end"><button class="btn ghost" id="dgX">Close</button></div>`, () => $('#dgX').onclick = closeModal); } };
 L.libraryDigest = () => digestText(digest());
+})();
+(() => {
+'use strict';
+/* ================= TOOLBOX: tools to try, saved from anywhere ================= */
+const L = window.__LG;
+const { IN_CLAUDE, $, $$, esc, today, safeUrl, nowIso, relDate, LS, toast, md, S, C, put, patch, del, newId, AI, aiError, aiOK, renderers, render, openModal, closeModal, setView } = L;
+const hostOf = u => { try { return new URL(u).hostname.replace(/^www\./,''); } catch(e){ return ''; } };
+const STATUS = {totry:['To try','var(--warn)'], trying:['Trying','var(--accent)'], tried:['Tried','var(--fg-3)'], keep:['Keeping','var(--good)'], drop:['Dropped','var(--crit)']};
+const tools = () => [...C('tools').values()].sort((a,b)=>String(b.at||b.added).localeCompare(String(a.at||a.added)));
+const findTool = (name, url) => tools().find(t => (url && t.url===url) || (!url && name && String(t.name).toLowerCase()===String(name).toLowerCase()));
+
+/* the "Save to Toolbox" button used on Library, Inbox, News, Trending and Research */
+function toolBtn({name='', url='', desc='', from=''}){
+  const ex = findTool(name, url);
+  if (ex) return `<button class="btn small ghost" data-opentool="${esc(ex.id)}" title="Already in your Toolbox">⚒ In Toolbox</button>`;
+  return `<button class="btn small ghost" data-savetool="1" data-tname="${esc(String(name).slice(0,120))}" data-turl="${esc(url||'')}" data-tdesc="${esc(String(desc||'').slice(0,600))}" data-tfrom="${esc(from)}" title="Save it to your Toolbox: what it does, what it needs, key links">⚒ Save to Toolbox</button>`;
+}
+L.toolBtn = toolBtn;
+
+async function saveTool({name='', url='', desc='', from='', quiet=false}){
+  url = safeUrl(url) || ''; name = String(name||'').replace(/\s+/g,' ').trim();
+  if (!name && url) name = hostOf(url).includes('github.com') ? (url.match(/github\.com\/[^/]+\/([^/#?]+)/)||[])[1] || hostOf(url) : hostOf(url);
+  if (!name) { toast('Paste a link or type the tool name.'); return null; }
+  const ex = findTool(name, url); if (ex) { if (!quiet) toast('Already in your Toolbox.'); return ex.id; }
+  let srcLink = null; if (/youtube\.com|youtu\.be|instagram\.com/.test(hostOf(url))) { srcLink = {label:'Where I saw it', url}; url = ''; }
+  const id = newId('tool '+name);
+  const doc = {name:name.slice(0,120), url, what:String(desc||'').slice(0,800), needs:[], links: url ? [{label: /github\.com/.test(url) ? 'GitHub' : 'Website', url}] : (srcLink ? [srcLink] : []), start:'', pricing:'', tags:[], status:'totry', notes:'', from:String(from||'').slice(0,80), added:today(), at:nowIso(), source:'me', enrich:'pending'};
+  await put('tools', id, doc);
+  if (!quiet) toast(`Saved to your Toolbox: ${doc.name}`, 3000);
+  enrichTool(Object.assign({id}, doc));
+  return id;
+}
+L.saveTool = saveTool;
+
+async function ghInfo(url){
+  const m = String(url||'').match(/github\.com\/([^/]+)\/([^/#?]+)/); if (!m) return null;
+  try { const r = await fetch(`https://api.github.com/repos/${m[1]}/${m[2].replace(/\.git$/,'')}`); if (!r.ok) return null; const j = await r.json();
+    let readme = ''; try { const rr = await fetch(`https://api.github.com/repos/${j.full_name}/readme`, {headers:{accept:'application/vnd.github.raw'}}); if (rr.ok) readme = (await rr.text()).slice(0, 7000); } catch(e){}
+    return {name:j.name, desc:j.description||'', homepage:j.homepage||'', license:j.license?.spdx_id||'', stars:j.stargazers_count||0, lang:j.language||'', topics:j.topics||[], readme, url:j.html_url}; } catch(e){ return null; }
+}
+function okLink(u, t, gh){
+  const h = hostOf(u); if (!h || !/^https:\/\//.test(u)) return false;
+  const root = x => x.split('.').slice(-2).join('.');
+  const mine = [hostOf(t.url), gh && hostOf(gh.homepage)].filter(Boolean);
+  if (mine.some(x => h===x || root(h)===root(x))) return true;
+  if (['github.com','pypi.org','npmjs.com','huggingface.co','hub.docker.com','marketplace.visualstudio.com','chromewebstore.google.com'].some(x => h===x || h.endsWith('.'+x))) return true;
+  return !!(L.trustedUrl && L.trustedUrl(u));
+}
+const enriching = new Set(); let tbBotT = null;
+async function enrichTool(t, force=false){
+  if (!t || enriching.has(t.id)) return; enriching.add(t.id);
+  try {
+    const gh = await ghInfo(t.url);
+    const base = {};
+    if (gh) { const links = [...(t.links||[])]; const add = (label, url) => { if (url && !links.some(l => l.url===url)) links.push({label, url}); };
+      add('GitHub', gh.url); if (gh.homepage) add('Website', /^https?:/.test(gh.homepage) ? gh.homepage : 'https://'+gh.homepage);
+      Object.assign(base, {links, what: t.what || gh.desc, tags: (t.tags||[]).length ? t.tags : gh.topics.slice(0,6), meta:{stars:gh.stars, license:gh.license, lang:gh.lang}}); }
+    if (aiOK() && (L.buildMode ? L.buildMode()!=='bot' : true)) {
+      await patch('tools', t.id, Object.assign(base, {enrich:'working'}));
+      const out = await AI.json(toolPrompt(Object.assign({}, t, base), gh), {tier:'smart'});
+      if (!out || !out.what) throw {code:'invalid_json'};
+      await patch('tools', t.id, applyAi(Object.assign({}, t, base), out, gh));
+    } else {
+      await patch('tools', t.id, Object.assign(base, {enrich:'pending'}));
+      if (force || (L.useBot && L.useBot())) { if (L.botReady && L.botReady()) { clearTimeout(tbBotT); tbBotT = setTimeout(() => { LS.set('botLast', Date.now()); L.botRun('morning', 'your toolbox'); }, force ? 300 : 8000); } else if (force && L.howToBuild) L.howToBuild(); }
+    }
+  } catch(e){ aiError(e); patch('tools', t.id, {enrich:'pending'}); }
+  enriching.delete(t.id);
+}
+L.enrichTool = enrichTool;
+function toolPrompt(t, gh){
+  return `Describe this tool for a learner who wants to try it and decide if it is useful.
+Tool: ${t.name}${t.url ? '\nLink: '+t.url : ''}${t.what ? '\nKnown description: '+t.what : ''}${t.from ? '\nSaved from: '+t.from : ''}
+${gh ? `GitHub: ${gh.url} · ${gh.stars} stars · license ${gh.license||'unknown'} · ${gh.lang||''}\nREADME (partial):\n"""${gh.readme.slice(0,6000)}"""` : ''}
+If the link is a video or article about a tool, describe the tool it is about, not the video.
+Reply with only JSON:
+{"name":"the tool's real name","what":"2-4 plain sentences: what it does and when you would use it","needs":["each thing needed to run it, e.g. Python 3.10+, Node 20, Docker, an OpenAI API key, a GPU with 8 GB VRAM, a paid plan"],"pricing":"Free | Open source (license) | Free tier + paid | Paid","start":"the single first command or step to try it","links":[{"label":"Website | Docs | Quickstart | GitHub | Paper","url":"only official URLs you are certain exist"}],"tags":["2-5 short tags"],"alternatives":["up to 3 similar tools"]}`;
+}
+function applyAi(t, o, gh){
+  const links = [...(t.links||[])];
+  for (const l of (o.links||[]).slice(0,8)) { const u = String(l && l.url || ''); if (!u || !/^https:\/\//.test(u) || links.some(x => x.url===u)) continue; const ok = okLink(u, t, gh); links.push({label:String(l.label||hostOf(u)).slice(0,40)+(ok?'':' (AI, check)'), url:u}); }
+  const mainUrl = t.url || (links.find(l => !/check|Where I saw/.test(l.label)) || {}).url || '';
+  return {url: mainUrl, name: String(o.name||t.name).slice(0,120), what:String(o.what||'').slice(0,900), needs:(o.needs||[]).map(x=>String(x).slice(0,140)).filter(Boolean).slice(0,8), pricing:String(o.pricing||'').slice(0,80), start:String(o.start||'').slice(0,300),
+    links, tags:(o.tags||[]).map(x=>String(x).slice(0,30)).slice(0,6), alternatives:(o.alternatives||[]).map(x=>String(x).slice(0,60)).slice(0,3), enrich:'done', enriched:today()};
+}
+
+/* clicks from any page */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-savetool]'); if (b) { e.preventDefault(); e.stopPropagation(); b.disabled = true; b.textContent = '⚒ Saved';
+    saveTool({name:b.dataset.tname, url:b.dataset.turl, desc:b.dataset.tdesc, from:b.dataset.tfrom}).then(() => render()); return; }
+  const o = e.target.closest('[data-opentool]'); if (o) { e.preventDefault(); e.stopPropagation(); tb.open = o.dataset.opentool; setView('toolbox'); setTimeout(() => { const el = document.querySelector(`[data-tool="${CSS.escape(tb.open)}"]`); if (el) el.scrollIntoView({block:'center'}); }, 300); }
+}, true);
+
+/* ---- the Toolbox page ---- */
+const tb = {st:'all', q:'', open:null};
+renderers.push(function toolboxChrome(){ const n = tools().filter(t=>t.status==='totry').length; const b = $('#toolBadge'); if (b) { b.hidden = !n; b.textContent = n; } });
+renderers.push(function toolboxView(){
+  if (S.view!=='toolbox') return;
+  const a = document.activeElement; const all = tools();
+  $('#tbStatus').innerHTML = [['all','All'], ...Object.entries(STATUS).map(([k,v])=>[k,v[0]])].map(([k,l]) => `<button class="chip ${tb.st===k?'on':''}" data-tbs="${k}">${l} <span class="faint mono">${k==='all'?all.length:all.filter(t=>t.status===k).length}</span></button>`).join('');
+  $$('#tbStatus [data-tbs]').forEach(b => b.onclick = () => { tb.st = b.dataset.tbs; render(); });
+  if (a && $('#tbList').contains(a) && a.matches('input,textarea,select')) return;
+  const q = tb.q.trim().toLowerCase();
+  const list = all.filter(t => (tb.st==='all' || t.status===tb.st) && (!q || [t.name, t.what, (t.tags||[]).join(' '), (t.needs||[]).join(' '), t.notes].join(' ').toLowerCase().includes(q)));
+  $('#tbList').innerHTML = list.length ? list.map(card).join('') : `<div class="empty">${all.length ? 'Nothing matches.' : 'No tools yet. Paste a link or a tool name above, or tap ⚒ Save to Toolbox on anything in your Library, Inbox, News, Trending or Research.'}</div>`;
+  wire();
+});
+function card(t){
+  const st = STATUS[t.status] || STATUS.totry; const busy = t.enrich==='working' || enriching.has(t.id);
+  const meta = [t.pricing, t.meta?.stars ? '★ '+(t.meta.stars>=1000 ? (t.meta.stars/1000).toFixed(1)+'k' : t.meta.stars) : '', t.meta?.license, t.meta?.lang].filter(Boolean).map(esc).join(' · ');
+  return `<article class="bigcard tool" data-tool="${esc(t.id)}" style="cursor:default;${tb.open===t.id?'outline:2px solid var(--accent);':''}">
+    <div class="row" style="gap:8px;justify-content:space-between"><h4 style="font:600 16px/1.3 var(--f-body);margin:0">${t.url?`<a href="${esc(safeUrl(t.url))}" target="_blank" rel="noopener" style="color:var(--fg);text-decoration:none">${esc(t.name)} ↗</a>`:esc(t.name)}</h4>
+      <select class="inp tier" data-tst="${esc(t.id)}" aria-label="Status" style="width:auto;--c:${st[1]}">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===t.status?'selected':''}>${v[0]}</option>`).join('')}</select></div>
+    ${meta?`<div class="faint" style="font-size:12.5px">${meta}</div>`:''}
+    ${(t.tags||[]).length?`<div class="chips">${t.tags.map(x=>`<span class="chip" style="cursor:default">${esc(x)}</span>`).join('')}</div>`:''}
+    <div><span class="flabel">What it does</span><div style="font-size:14px">${t.what ? esc(t.what) : `<span class="faint">${busy ? 'Filling in the details…' : 'Not filled in yet.'}</span>`}</div></div>
+    ${(t.needs||[]).length?`<div><span class="flabel">What it needs</span><ul class="kp">${t.needs.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`:''}
+    ${t.start?`<div><span class="flabel">Try it</span><code style="display:block;white-space:pre-wrap;font-size:12.5px;background:var(--panel-2);padding:6px 8px;border-radius:8px">${esc(t.start)}</code></div>`:''}
+    ${(t.links||[]).length?`<div><span class="flabel">Links</span><div class="chips">${t.links.map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">↗ ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
+    ${(t.alternatives||[]).length?`<div class="faint" style="font-size:12.5px">Similar: ${t.alternatives.map(esc).join(', ')}</div>`:''}
+    <textarea class="inp" data-tnote="${esc(t.id)}" placeholder="My notes: did it work, is it worth keeping?" style="min-height:44px;font-size:13px">${esc(t.notes||'')}</textarea>
+    <div class="row w" style="gap:6px;margin-top:auto">
+      <button class="btn small ${t.what?'ghost':'primary'}" data-tenrich="${esc(t.id)}" ${busy?'disabled':''}>${busy?'Working…':(t.enrich==='done'?'Refresh details':'Fill in details')}</button>
+      <button class="btn small ghost" data-ttask="${esc(t.id)}">Add “Try it” task</button>
+      <button class="btn small ghost" data-tkit="${esc(t.id)}">Study kit</button>
+      <button class="btn small ghost" data-tedit="${esc(t.id)}">Edit</button>
+      <button class="btn small ghost" data-tdel="${esc(t.id)}" style="margin-left:auto">Remove</button></div>
+    <div class="faint" style="font-size:11.5px">Saved ${esc(relDate(t.added))}${t.from?' from '+esc(t.from):''}</div></article>`;
+}
+function wire(){
+  $$('#tbList [data-tst]').forEach(s => s.onchange = () => patch('tools', s.dataset.tst, {status:s.value, ...(s.value==='tried'||s.value==='keep'||s.value==='drop' ? {triedOn:today()} : {})}));
+  $$('#tbList [data-tnote]').forEach(x => { let tm; x.oninput = () => { clearTimeout(tm); tm = setTimeout(() => patch('tools', x.dataset.tnote, {notes:x.value.slice(0,2000)}), 700); }; x.onblur = () => { clearTimeout(tm); patch('tools', x.dataset.tnote, {notes:x.value.slice(0,2000)}); }; });
+  $$('#tbList [data-tenrich]').forEach(b => b.onclick = () => { const t = C('tools').get(b.dataset.tenrich); b.disabled = true; b.textContent = 'Working…'; enrichTool(t, true).then(render); });
+  $$('#tbList [data-ttask]').forEach(b => b.onclick = () => { const t = C('tools').get(b.dataset.ttask); if (!L.addTask) return; L.addTask({title:'Try '+t.name, notes:[t.start, (t.needs||[]).length ? 'Needs: '+t.needs.join('; ') : ''].filter(Boolean).join('\n'), links:(t.links||[]).slice(0,4), minutes:30}); patch('tools', t.id, {status: t.status==='totry' ? 'trying' : t.status}); });
+  $$('#tbList [data-tkit]').forEach(b => b.onclick = () => { const t = C('tools').get(b.dataset.tkit); L.addToInbox({url: t.url || t.name, title: t.url ? t.name : '', note:'Saved from my Toolbox'}); });
+  $$('#tbList [data-tdel]').forEach(b => b.onclick = () => { del('tools', b.dataset.tdel); toast('Removed from your Toolbox.'); });
+  $$('#tbList [data-tedit]').forEach(b => b.onclick = () => editTool(C('tools').get(b.dataset.tedit)));
+}
+function editTool(t){
+  const links = (t.links||[]).map(l => `${l.label} | ${l.url}`).join('\n');
+  openModal(`<h3>Edit ${esc(t.name)}</h3>
+    <div class="field"><label for="teName">Name</label><input class="inp" id="teName" value="${esc(t.name)}"></div>
+    <div class="field"><label for="teUrl">Main link</label><input class="inp" id="teUrl" value="${esc(t.url||'')}"></div>
+    <div class="field"><label for="teWhat">What it does</label><textarea class="inp" id="teWhat">${esc(t.what||'')}</textarea></div>
+    <div class="field"><label for="teNeeds">What it needs (one per line)</label><textarea class="inp" id="teNeeds">${esc((t.needs||[]).join('\n'))}</textarea></div>
+    <div class="field"><label for="teStart">Try it (first command or step)</label><input class="inp" id="teStart" value="${esc(t.start||'')}"></div>
+    <div class="field"><label for="teLinks">Links (one per line: label | url)</label><textarea class="inp" id="teLinks">${esc(links)}</textarea></div>
+    <div class="field"><label for="teTags">Tags (comma separated)</label><input class="inp" id="teTags" value="${esc((t.tags||[]).join(', '))}"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="teX">Cancel</button><button class="btn primary" id="teOk">Save</button></div>`, () => {
+    $('#teX').onclick = closeModal;
+    $('#teOk').onclick = () => { const lk = $('#teLinks').value.split('\n').map(s => { const [a, b] = s.includes('|') ? s.split('|') : ['', s]; const u = safeUrl(String(b||'').trim()); return u ? {label:(a||'').trim() || hostOf(u), url:u} : null; }).filter(Boolean);
+      patch('tools', t.id, {name:$('#teName').value.trim().slice(0,120) || t.name, url:safeUrl($('#teUrl').value.trim()) || '', what:$('#teWhat').value.slice(0,900), needs:$('#teNeeds').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,10), start:$('#teStart').value.slice(0,300), links:lk.slice(0,12), tags:$('#teTags').value.split(',').map(s=>s.trim()).filter(Boolean).slice(0,8)}); closeModal(); toast('Saved.'); }; });
+}
+const go = () => { const v = $('#tbAdd').value.trim(); if (!v) return; const u = safeUrl(v) || (v.match(/https?:\/\/\S+/)||[])[0] || ''; saveTool({name: u ? '' : v, url:u, from:'added by hand'}).then(id => { if (id) $('#tbAdd').value = ''; }); };
+$('#tbGo').onclick = go; $('#tbAdd').addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); go(); } });
+$('#tbSearch').addEventListener('input', e => { tb.q = e.target.value; render(); });
+/* fill in details for tools saved while no AI was on (e.g. on the phone) */
+setInterval(() => { if (IN_CLAUDE || !aiOK() || (L.buildMode && L.buildMode()==='bot') || document.hidden) return; const t = tools().find(x => x.enrich==='pending' && !enriching.has(x.id) && Date.now() - Date.parse(x.at||0) > 20000); if (t) enrichTool(t); }, 45000);
 })();
 
 </script>
