@@ -1824,7 +1824,7 @@ renderers.push(function drawer(){
   ({topic:drawTopic, path:L.drawPath, project:L.drawProject, problem:L.drawProblem})[type](x, d);
   fillTierSelects();
 });
-function head(x, label){ const c = catOf(x); return `<div class="d-head"><span class="dot" style="--c:${esc(c.color)}"></span><span class="code">${esc(label)}</span><button class="x" data-close aria-label="Close">×</button></div>`; }
+function head(x, label){ const c = catOf(x); return `<div class="d-head"><span class="dot" style="--c:${esc(c.color)}"></span><span class="code">${esc(label)}</span>${L.saveMenuBtn ? L.saveMenuBtn({name:x.title||'', url:x.url || (x.resources||[])[0]?.url || '', desc:x.explain || x.notes || x.why || '', from:'Galaxy', small:true}) : ''}<button class="x" data-close aria-label="Close">×</button></div>`; }
 document.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeDrawer(); });
 L.head = head;
 const rebuild = () => { $('#drawer').__built = null; render(); }; L.rebuild = rebuild;
@@ -2410,7 +2410,7 @@ renderers.push(function newsView(){
     return `<article class="bigcard" style="cursor:default"><div class="meta"><span class="kind">${esc(KINDS[n.kind]||n.kind)}</span>${c?`<span class="dot" style="--c:${esc(c.color)}"></span><span>${esc(c.name)}</span>`:''}<span>· ${esc(n.source||'')}</span><span style="margin-left:auto">${esc(relDate(n.date))}</span></div>
       <h4 style="font:600 15.5px/1.3 var(--f-body)"><a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener" style="color:var(--fg);text-decoration:none">${esc(n.title)}</a></h4>${n.summary?`<p style="margin:0;color:var(--fg-2);font-size:13.5px">${esc(n.summary)}</p>`:''}
       ${why?`<div class="aibox">${md(why)}</div>`:''}
-      <div class="tc-act" style="margin-top:auto">${saved ? `<button class="btn small ghost" data-open="topic:${esc(n.savedTopic)}">In your bucket</button>` : `<button class="btn small w" data-save="${esc(n.id)}">Save to bucket</button>`}${ai && !why?`<button class="btn small ghost" data-why="${esc(n.id)}">Why it matters to me</button>`:''}${L.toolBtn ? L.toolBtn({name:n.title, url:n.url, desc:n.summary, from:'News'}) : ''}</div></article>`; }).join('')
+      <div class="tc-act" style="margin-top:auto">${saved ? `<button class="btn small ghost" data-open="topic:${esc(n.savedTopic)}">In your bucket</button>` : `<button class="btn small w" data-save="${esc(n.id)}">Save to bucket</button>`}${ai && !why?`<button class="btn small ghost" data-why="${esc(n.id)}">Why it matters to me</button>`:''}${L.saveBtns ? L.saveBtns({name:n.title, url:n.url, desc:n.summary, from:'News'}) : ''}</div></article>`; }).join('')
     : `<div class="empty">${S.onlyMine ? '"Only mine" is on, so only news you saved shows here.' : 'No news here yet. Claude adds new items every morning.'}</div>`;
   const m = C('meta').get('refresh') || {};
   $('#lastRefresh').textContent = m.lastRun ? `Last refreshed ${relDate(String(m.lastRun).slice(0,10))}` : 'Refreshes every morning';
@@ -2647,7 +2647,7 @@ function trustedUrl(u, extra){ const h = hostOf(u); if (!h || !/^https:\/\//.tes
 function cleanStep(s, extraUrls, by){
   const links = [];
   for (const q of (s.video_search||[]).slice(0,3)) if (q) links.push({label:'YouTube: '+String(q).slice(0,80), url:ytSearch(String(q).slice(0,120)), by:'ai'});
-  for (const l of (s.links||[]).slice(0,5)) if (l && trustedUrl(String(l.url||''), extraUrls)) links.push({label:String(l.label||'').slice(0,120), url:String(l.url), by:'ai'});
+  for (const l of (s.links||[]).slice(0,5)) { const u = String(l && l.url || ''); if (!/^https:\/\/[^\s]+$/.test(u)) continue; const ok = trustedUrl(u, extraUrls); links.push({label:String(l.label||'').slice(0,110)+(ok?'':' (AI, check)'), url:u, by:'ai'}); }
   return {id:'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), t:String(s.t||'New step').slice(0,140), summary:String(s.summary||'').slice(0,600), do:String(s.do||'').slice(0,600), links, done:false, notes:'', source:by, added:today()};
 }
 L.cleanStep = cleanStep;
@@ -3200,7 +3200,7 @@ function kitCard(i, ai){
   const src = `${i.url?`<a class="src" href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener">${esc(i.url)}</a>`:''}${i.note?`<div class="muted" style="font-size:13px">“${esc(i.note)}”</div>`:''}`;
   if (i.status!=='done' || !k) return `<div class="kit">${head}<h4>${esc(i.title || hostOf(i.url) || 'Untitled')}</h4>${src}
     ${i.status==='failed' ? `<p class="muted" style="margin:0;font-size:13.5px">${esc(i.error || 'Could not read this link.')} Add the caption or transcript and try again.</p>` : `<p class="faint" style="margin:0;font-size:13px">${i.text ? 'Text attached. ' : ''}${i.status==='processing' ? 'Building now…' : (i.botAsked && Date.now()-Date.parse(i.botAsked) < 900000) ? 'Your GitHub bot was started '+esc(relDate(String(i.botAsked).slice(0,10)))+' at '+esc(new Date(i.botAsked).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}))+'. Results appear here in 2 to 4 minutes.' : IN_CLAUDE ? 'Claude builds the kit on the morning refresh (or Refresh now on the News page).' : useBrowser() ? 'Starts building in a few seconds.' : botOK() ? 'Waiting for your GitHub bot. Tap Run bot now to start it right away.' : ai ? 'Tap Build now.' : 'Not built yet: this browser has no AI turned on and the bot is not connected. Tap Build now to set it up.'}</p>`}
-    <div class="row w" style="gap:6px">${useBrowser()?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(botOK()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>${ai?`<button class="btn small ghost" data-ibact="build" data-id="${esc(i.id)}">Build here instead</button>`:''}`:(ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`))}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}${L.toolBtn ? L.toolBtn({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${useBrowser()?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:(botOK()?`<button class="btn small primary" data-ibact="botnow" data-id="${esc(i.id)}">Run bot now</button>${ai?`<button class="btn small ghost" data-ibact="build" data-id="${esc(i.id)}">Build here instead</button>`:''}`:(ai?`<button class="btn small primary" data-ibact="build" data-id="${esc(i.id)}">Build now</button>`:`<button class="btn small primary" data-ibact="howto" data-id="${esc(i.id)}">Build now</button>`))}<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">${i.text?'Edit text':'Add transcript / caption'}</button>${i.status==='failed'?`<button class="btn small ghost" data-ibact="retry" data-id="${esc(i.id)}">Retry on next run</button>`:''}${L.saveBtns ? L.saveBtns({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
   const c = catOf({cat:k.cat}); const nt = (r.newTopics||[]).map(id=>C('topics').get(id)).filter(Boolean); const main = C('topics').get(r.topicId); const pth = C('paths').get(r.pathId);
   const pr = pth ? L.pathProgress(pth) : null;
   return `<div class="kit">${head}<h4>${esc(k.subject)}</h4><div class="row" style="gap:8px;font-size:12.5px" ><span class="dot" style="--c:${esc(c.color)}"></span><span class="faint">${esc(c.name)}${k.level?' · '+esc(k.level):''}</span></div>${src}
@@ -3210,7 +3210,7 @@ function kitCard(i, ai){
     ${pth?`<div><span class="flabel">Study plan · ${pr.done}/${pr.total}</span><ol class="kp">${(pth.steps||[]).map(s=>`<li style="${s.done?'text-decoration:line-through;color:var(--fg-3)':''}">${esc(s.t)}${s.dur?` <span class="faint mono" style="font-size:11.5px">${esc(s.dur.replace(':00',''))}m</span>`:''}</li>`).join('')}</ol></div>`:''}
     ${videosHtml(k)}
     ${pth && (pth.links||[]).filter(l=>!/youtube\.com\/watch/.test(l.url)).length?`<div><span class="flabel">Resources</span><div class="chips">${pth.links.filter(l=>!/youtube\.com\/watch/.test(l.url)).map(l=>`<a class="chip" href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}</div></div>`:''}
-    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${(ai||(L.botReady&&L.botReady()))?`<button class="btn small ghost" data-ibact="again" data-id="${esc(i.id)}" title="Rebuild this from scratch. Your progress on the steps is kept.">Do it again</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}${L.toolBtn ? L.toolBtn({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
+    <div class="row w" style="gap:6px">${pth?`<button class="btn small primary" data-ibact="path" data-id="${esc(i.id)}">Open study plan</button><button class="btn small" data-ibact="week" data-id="${esc(i.id)}">Add to this week</button>`:''}${main?`<button class="btn small ghost" data-ibact="topic" data-id="${esc(i.id)}">Topic, flashcards &amp; tutor</button>`:''}${(ai||(L.botReady&&L.botReady()))?`<button class="btn small ghost" data-ibact="again" data-id="${esc(i.id)}" title="Rebuild this from scratch. Your progress on the steps is kept.">Do it again</button>`:''}${ai?`<button class="btn small ghost" data-ibact="text" data-id="${esc(i.id)}">Improve with transcript</button>`:''}${L.saveBtns ? L.saveBtns({name:(i.kit && i.kit.subject) || i.title || '', url:i.url, desc:(i.kit && i.kit.summary) || i.note || '', from:'Library'}) : ''}<button class="btn small ghost" data-ibact="del" data-id="${esc(i.id)}" style="margin-left:auto">Remove</button></div></div>`;
 }
 L.kitCard = kitCard;
 $('#ibAdd').onclick = async () => { const id = await addToInbox({url:$('#ibUrl').value, note:$('#ibNote').value, text:$('#ibText').value, tier:$('#ibTier').value}); if (id) ['#ibUrl','#ibNote','#ibText'].forEach(s=>$(s).value=''); };
@@ -3227,7 +3227,7 @@ $('#ibUrl').addEventListener('paste', () => setTimeout(() => { const v = $('#ibU
 })();
 
 /* ---------------- TRENDING ---------------- */
-const tr = {period:'today', lang:'AI'};
+const tr = {period:'today', lang:'All'};
 renderers.push(function trendingView(){
   if (S.view!=='trending') return;
   const snaps = [...C('trends').values()].sort((a,b)=>String(b.date||b.id).localeCompare(String(a.date||a.id)));
@@ -3237,17 +3237,17 @@ renderers.push(function trendingView(){
   $('#trWhen').textContent = tr.period==='today' ? `as of ${relDate(snaps[0].date||snaps[0].id)}` : `${use.length} day${use.length>1?'s':''}`;
   const repos = new Map(); for (const s of use) for (const r of (s.repos||[])) { const cur = repos.get(r.url); if (cur) { cur.days++; cur.today = Math.max(cur.today||0, r.today||0); cur.stars = Math.max(cur.stars||0, r.stars||0); } else repos.set(r.url, Object.assign({days:1}, r)); }
   let rl = [...repos.values()].sort((a,b)=>(b.days-a.days) || ((b.today||0)-(a.today||0)) || ((b.stars||0)-(a.stars||0)));
-  const langs = ['AI','All', ...[...new Set(rl.map(r=>r.lang).filter(Boolean))].slice(0,6)];
+  const langs = ['All','AI', ...[...new Set(rl.map(r=>r.lang).filter(Boolean))].slice(0,6)];
   $('#trLang').innerHTML = langs.map(l=>`<button class="chip ${tr.lang===l?'on':''}" data-tl="${esc(l)}">${esc(l==='AI'?'AI only':l)}</button>`).join('');
   $$('#trLang [data-tl]').forEach(b => b.onclick = () => { tr.lang = b.dataset.tl; render(); });
   if (tr.lang==='AI') rl = rl.filter(r=>r.ai); else if (tr.lang!=='All') rl = rl.filter(r=>r.lang===tr.lang);
   const fmtK = n => n>=1000 ? (n/1000).toFixed(n>=10000?0:1)+'k' : String(n||0);
   const inInbox = new Set([...C('inbox').values()].map(i=>i.url));
   $('#trRepos').innerHTML = rl.slice(0,25).map(r => `<div class="trow"><div style="min-width:0"><h5><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">${esc(r.name)}</a></h5>${r.desc?`<p>${esc(r.desc)}</p>`:''}<div class="meta">${r.lang?`<span>${esc(r.lang)}</span>`:''}${r.stars?`<span>★ ${fmtK(r.stars)}</span>`:''}${r.today?`<span style="color:var(--gold)">+${fmtK(r.today)} today</span>`:''}${tr.period==='week'&&r.days>1?`<span>trending ${r.days} days</span>`:''}</div></div>
-    <div class="acts">${inInbox.has(r.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(r.url)}" data-trnote="${esc(r.desc||'')}" data-trtitle="${esc(r.name)}">Study kit</button>`}${L.toolBtn ? L.toolBtn({name:r.name, url:r.url, desc:r.desc, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">No repos for this filter.</p>';
+    <div class="acts">${inInbox.has(r.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(r.url)}" data-trnote="${esc(r.desc||'')}" data-trtitle="${esc(r.name)}">Study kit</button>`}${L.saveBtns ? L.saveBtns({name:r.name, url:r.url, desc:r.desc, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">No repos for this filter.</p>';
   const ai = new Map(); for (const s of use) for (const x of (s.ai||[])) if (!ai.has(x.url)) ai.set(x.url, Object.assign({day:s.date||s.id}, x));
   $('#trAi').innerHTML = [...ai.values()].slice(0,25).map(x => `<div class="trow"><div style="min-width:0"><div class="meta" style="margin:0 0 4px"><span class="kind">${esc(x.kind||'news')}</span><span>${esc(x.source||'')}</span>${tr.period==='week'?`<span>${esc(relDate(x.day))}</span>`:''}</div><h5><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a></h5>${x.summary?`<p>${esc(x.summary)}</p>`:''}</div>
-    <div class="acts">${inInbox.has(x.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(x.url)}" data-trnote="${esc(x.summary||'')}" data-trtitle="${esc(x.title)}">Study kit</button>`}${L.toolBtn ? L.toolBtn({name:x.title, url:x.url, desc:x.summary, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">Nothing yet.</p>';
+    <div class="acts">${inInbox.has(x.url)?'<span class="pill" style="--c:var(--good)">in inbox</span>':`<button class="btn small w" data-trkit="${esc(x.url)}" data-trnote="${esc(x.summary||'')}" data-trtitle="${esc(x.title)}">Study kit</button>`}${L.saveBtns ? L.saveBtns({name:x.title, url:x.url, desc:x.summary, from:'Trending'}) : ''}</div></div>`).join('') || '<p class="empty">Nothing yet.</p>';
 });
 document.addEventListener('click', e => { const b = e.target.closest('[data-trkit]'); if (!b) return; b.disabled = true;
   addToInbox({url:b.dataset.trkit, note:b.dataset.trnote, title:b.dataset.trtitle, text:b.dataset.trnote, now:aiOK(), tier:'smart'}); });
@@ -3366,7 +3366,7 @@ function drawDossier(root, r){
   const d = r.dossier; const ai = aiOK(); const pill = STATUS_PILL[r.working?'improve':r.status] || STATUS_PILL.pending;
   const haveTitles = new Set([...C('topics').values()].map(t=>t.title.toLowerCase())); const taskTitles = new Set([...C('tasks').values()].map(t=>t.title.toLowerCase()));
   root.innerHTML = `<div class="view-head"><div><button class="btn small ghost" id="rsBack">← All research</button><div class="eyebrow" style="margin-top:12px">${esc(MODES[r.mode]||'Learn it')} · requested ${esc(relDate(r.added))}${r.researchedBy?` · researched by ${esc(r.researchedBy)}`:''}</div><h2>${esc(d?.title || r.query)}</h2>${d?.summary?`<p>${esc(d.summary)}</p>`:''}</div>
-      <div class="row">${L.toolBtn ? L.toolBtn({name:d?.title || r.query, url:(d?.resources||[]).map(x=>x&&x.url).find(u => /^https:/.test(u||'')) || '', desc:d?.summary || '', from:'Research'}) : ''}<span class="pill" style="--c:${pill[1]}">${r.working?'Working…':pill[0]}</span><label class="switch" title="Re-check weekly for what's new"><input type="checkbox" id="rsWatch" ${r.watch?'checked':''}><span>Keep updated</span></label></div></div>
+      <div class="row">${L.saveBtns ? L.saveBtns({name:d?.title || r.query, url:(d?.resources||[]).map(x=>x&&x.url).find(u => /^https:/.test(u||'')) || '', desc:d?.summary || '', from:'Research'}) : ''}<span class="pill" style="--c:${pill[1]}">${r.working?'Working…':pill[0]}</span><label class="switch" title="Re-check weekly for what's new"><input type="checkbox" id="rsWatch" ${r.watch?'checked':''}><span>Keep updated</span></label></div></div>
     ${!d ? `<div class="panel"><p class="muted" style="margin:0">${r.status==='failed' ? esc(r.error||'Research failed.') : IN_CLAUDE ? 'Claude researches this on the web tonight. It will be here in the morning.' : 'Your bot researches this on its next run.'}</p>${ai?`<div class="row" style="margin-top:10px"><span class="ai-row"><button class="btn small primary" id="rsDraftOne">Draft now with AI</button>${tierHtml('rsTier1')}</span></div>`:''}${!ai && L.botReady && L.botReady() ? `<div class="row" style="margin-top:10px"><button class="btn small primary" id="rsBotNow">Research now (bot)</button></div>` : ''}</div>` : `
     <div class="grid-2" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
       <div class="stack">
@@ -3478,7 +3478,7 @@ function taskRow(t){
   const od = t.status!=='done' && t.due && t.due < today();
   return `<div class="trow task ${t.status==='done'?'is-done':''}"><input type="checkbox" class="check w" data-tkdone="${esc(t.id)}" ${t.status==='done'?'checked':''} aria-label="Done"><div style="min-width:0"><h5>${esc(t.title)}</h5>
     ${t.notes?`<p>${esc(t.notes.slice(0,200))}</p>`:''}<div class="meta">${t.due?`<span style="${od?'color:var(--crit)':''}">${od?'overdue · ':''}${esc(relDate(t.due))}</span>`:''}${t.minutes?`<span>${t.minutes}m</span>`:''}${t.ref?`<a href="#" data-tkref="${esc(t.id)}" style="color:var(--accent)">↳ ${esc(t.ref.title||t.ref.kind)}</a>`:''}${(t.links||[]).map(l=>`<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener" style="color:var(--accent)">${L.isVid(l.url)?'▶':'↗'} ${esc(l.label||hostOf(l.url))}</a>`).join('')}${t.doneAt?`<span>done ${esc(relDate(t.doneAt))}</span>`:''}</div></div>
-    <div class="acts"><button class="btn small ghost w" data-tkfocus="${esc(t.id)}" title="Focus on this">◷</button><button class="btn small ghost w" data-tkedit="${esc(t.id)}">Edit</button></div></div>`;
+    <div class="acts"><button class="btn small ghost w" data-tkfocus="${esc(t.id)}" title="Focus on this">◷</button><button class="btn small ghost w" data-tkedit="${esc(t.id)}">Edit</button>${L.saveMenuBtn ? L.saveMenuBtn({name:t.title, url:(t.links||[])[0]?.url || '', desc:t.notes || '', from:'Tasks', small:true}) : ''}</div></div>`;
 }
 renderers.push(function taskBadge(){ const n = [...C('tasks').values()].filter(t=>t.status!=='done' && t.due && t.due <= today()).length; $('#taskBadge').hidden = !n; $('#taskBadge').textContent = n; });
 renderers.push(function tasksView(){
@@ -3870,6 +3870,43 @@ function toolBtn({name='', url='', desc='', from=''}){
   return `<button class="btn small ghost" data-savetool="1" data-tname="${esc(String(name).slice(0,120))}" data-turl="${esc(url||'')}" data-tdesc="${esc(String(desc||'').slice(0,600))}" data-tfrom="${esc(from)}" title="Save it to your Toolbox: what it does, what it needs, key links">⚒ Save to Toolbox</button>`;
 }
 L.toolBtn = toolBtn;
+/* "+ Save to…": send anything anywhere (Library, Toolbox, Tasks, Bucket, Research) */
+function saveMenuBtn({name='', url='', desc='', from='', small=false}){
+  return `<button class="btn small ghost${small?' w':''}" data-savemenu="1" data-tname="${esc(String(name).slice(0,160))}" data-turl="${esc(url||'')}" data-tdesc="${esc(String(desc||'').slice(0,600))}" data-tfrom="${esc(from)}" title="Save this to your Library, Toolbox, Tasks, Bucket or Research">＋ Save to…</button>`;
+}
+L.saveMenuBtn = saveMenuBtn;
+L.saveBtns = o => toolBtn(o) + saveMenuBtn(o);
+function openSaveMenu({name, url, desc, from}){
+  url = safeUrl(url) || '';
+  const cats = L.catOptions ? L.catOptions(LS.get('lastSaveCat', ''), true) : '';
+  const opt = (k, label, hint, on) => `<label class="row" style="gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer"><input type="checkbox" data-sm="${k}" ${on?'checked':''} style="margin-top:3px"><span><b>${label}</b><br><span class="faint" style="font-size:12.5px">${hint}</span></span></label>`;
+  openModal(`<h3>Save “${esc(String(name||url).slice(0,80))}”</h3>
+    <div class="field"><label for="smName">Name</label><input class="inp" id="smName" value="${esc(name||'')}"></div>
+    ${url?`<div class="faint mono" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(url)}</div>`:''}
+    <div class="stack" style="gap:6px">
+      ${opt('lib','Library','Study kit: summary, step-by-step path, videos, flashcards', true)}
+      ${opt('tool','Toolbox','A tool to try: what it does, what it needs, links', false)}
+      ${opt('task','Tasks','A to-do on your Tasks page', false)}
+      ${opt('topic','Bucket','A topic to learn, shown in your galaxy and bucket', false)}
+      ${opt('rs','Research','A deep dive with sources', false)}
+    </div>
+    <div class="field" id="smCatWrap" hidden><label for="smCat">Category (any subject, not just tech)</label><select class="inp" id="smCat">${cats}</select><input class="inp" id="smNewCat" placeholder="New category name, e.g. Finance, Cooking, Guitar" hidden style="margin-top:6px"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn ghost" id="smX">Cancel</button><button class="btn primary" id="smGo">Save</button></div>`, () => {
+    const cw = () => { $('#smCatWrap').hidden = !$('[data-sm="topic"]').checked; $('#smNewCat').hidden = $('#smCat').value!=='__new'; };
+    $$('[data-sm]').forEach(c => c.onchange = cw); $('#smCat').onchange = cw; cw();
+    $('#smX').onclick = closeModal;
+    $('#smGo').onclick = async () => {
+      const nm = $('#smName').value.trim() || name || url; const pick = k => $(`[data-sm="${k}"]`).checked; const done = [];
+      if (pick('topic')) { const cat = L.ensureCategory($('#smCat').value, $('#smNewCat').value); if (!cat) { toast('Name the new category.'); return; } LS.set('lastSaveCat', cat);
+        L.createTopic({title:nm.slice(0,90), cat, status:'todo', source:'me', notes:desc||'', resources: url ? [{label:'Link', url}] : [], why: from ? 'Saved from '+from : ''}); done.push('Bucket'); }
+      if (pick('lib')) { await L.addToInbox({url: url || nm, title: url ? nm : '', note: from ? 'Saved from '+from : '', quiet:true}); done.push('Library'); }
+      if (pick('tool')) { await saveTool({name:nm, url, desc, from, quiet:true}); done.push('Toolbox'); }
+      if (pick('task') && L.addTask) { L.addTask({title:nm.slice(0,190), notes:desc||'', links: url ? [{label:'Link', url}] : [], minutes:30}, true); done.push('Tasks'); }
+      if (pick('rs') && L.addResearch) { await L.addResearch({query:nm.slice(0,160), note:[desc, url].filter(Boolean).join('\n').slice(0,500)}); done.push('Research'); }
+      closeModal(); if (done.length) toast('Saved to '+done.join(', ')+'.', 3500); render(); };
+  });
+}
+L.openSaveMenu = openSaveMenu;
 
 async function saveTool({name='', url='', desc='', from='', quiet=false}){
   url = safeUrl(url) || ''; name = String(name||'').replace(/\s+/g,' ').trim();
@@ -3942,6 +3979,7 @@ function applyAi(t, o, gh){
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-savetool]'); if (b) { e.preventDefault(); e.stopPropagation(); b.disabled = true; b.textContent = '⚒ Saved';
     saveTool({name:b.dataset.tname, url:b.dataset.turl, desc:b.dataset.tdesc, from:b.dataset.tfrom}).then(() => render()); return; }
+  const sm = e.target.closest('[data-savemenu]'); if (sm) { e.preventDefault(); e.stopPropagation(); openSaveMenu({name:sm.dataset.tname, url:sm.dataset.turl, desc:sm.dataset.tdesc, from:sm.dataset.tfrom}); return; }
   const o = e.target.closest('[data-opentool]'); if (o) { e.preventDefault(); e.stopPropagation(); tb.open = o.dataset.opentool; setView('toolbox'); setTimeout(() => { const el = document.querySelector(`[data-tool="${CSS.escape(tb.open)}"]`); if (el) el.scrollIntoView({block:'center'}); }, 300); }
 }, true);
 
