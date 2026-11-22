@@ -394,7 +394,18 @@
       await api('/repos/' + repo() + '/actions/workflows/cloud-job.yml/dispatches', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ref: CONF.branch, inputs: { kind: kind || 'daily' } }) });
       return true;
     }
-    return { repo, hasToken: () => !!tok(), setToken: (t) => cfg.set('gh.token', String(t || '').trim() || null), requestFeature, builds, runJob };
+    // Courses are always written by Claude Code (GitHub Actions), never by an AI key in the app.
+    // With a GitHub token the app opens the request itself; without one it hands back a prefilled issue link.
+    // The issue text only triggers the job: Claude reads the course request from the synced database, not from the issue.
+    async function requestCourse(ask, level, perDay) {
+      const title = 'Course: ' + String(ask || '').trim().replace(/\s+/g, ' ').slice(0, 80);
+      const body = ['Course request from the app. Claude Code writes the syllabus, finds the YouTube videos and saves the course into your synced data.',
+        'Level: ' + (level || 'intermediate') + ' · About ' + (Number(perDay) || 45) + ' min/day', 'Nothing else to do: it appears under Courses in a few minutes.'].join('\n\n');
+      if (!tok()) { const url = 'https://github.com/' + repo() + '/issues/new?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body); if (!ARTIFACT) window.open(url, '_blank', 'noopener'); return { url, number: null, link: true }; }
+      const j = await api('/repos/' + repo() + '/issues', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title, body }) });
+      return { url: j.html_url, number: j.number };
+    }
+    return { repo, hasToken: () => !!tok(), setToken: (t) => cfg.set('gh.token', String(t || '').trim() || null), requestFeature, requestCourse, builds, runJob };
   })();
 
   /* ---------- window.claude shim ---------- */

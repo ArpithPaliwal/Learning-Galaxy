@@ -15,8 +15,17 @@ Rules
   `usage`, `plans` or `meta/profile`.
 - Keep it bounded: at most ~40 writes per run. Quality over quantity.
 
-Do these in order (skip a step if there is nothing to do):
+Do these in order, starting at step 0 (skip a step if there is nothing to do):
 
+0. **Courses waiting to be written (Claude writes every course).** `list courses`; for each with status `drafting` and no
+   modules, `get` it (fields: `ask` = what the learner wants, `level`, `minutesPerDay`). Design a tight YouTube-based course:
+   3-6 modules, 2-4 video slots each, basics before advanced, ending with a small hands-on project. Look at `list topics`
+   and `get meta profile` so it fits what the learner already knows. Write the course back with `patch courses <id>`:
+   `title` (short), `summary` (2 sentences), `outcomes` (3-5 things they can do afterwards), `project` (one concrete mini project),
+   `modules`: [{ "id": "m1", "t": "module title", "goal": "one sentence", "videos": [{ "key": "v" + 5 random lowercase letters/digits,
+   "q": "precise YouTube search query", "why": "one sentence", "min": 15, "done": false }] }], and `status: "finding"`.
+   Then continue with step 1 for the same course in this run. Never leave a course in `drafting`: if you truly cannot write it,
+   set `status: "failed"` and `error` to one plain sentence for the learner.
 1. **Courses waiting for videos.** `list courses`; for each with status `drafting` or `finding`, `get` it. For every
    video slot (`modules[].videos[]`) that has no `url`: search YouTube for the slot's `q`/title, pick the best real
    video (prefer well-known teachers, recent, right level), and fill `id` (YouTube id), `url`

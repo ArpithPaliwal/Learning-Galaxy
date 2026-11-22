@@ -1116,7 +1116,19 @@ async function createCourse(ask, level='intermediate', perDay=45){
   const id = slug(ask)+'-'+rid();
   await put('courses', id, {ask, level, minutesPerDay: perDay, status:'drafting', title:'', modules:[], created: nowIso(), touched: nowIso()});
   $('#askText').value = ''; S.course = id; setTab('courses');
+  // The installed app never drafts courses with an AI key: Claude Code writes them through GitHub.
+  // (The claude.ai edition drafts with the viewer's own Claude account, which is Claude too.)
+  if (window.LG && !LG.ARTIFACT) { requestClaudeCourse(id, ask, level, perDay); return id; }
   draftCourse(id, ask, level, perDay); return id;
+}
+async function requestClaudeCourse(id, ask, level, perDay){
+  try {
+    if (LG.Sync.signedIn()) await LG.Sync.run(); // the course must reach the cloud database before Claude looks for it
+    else toast('Sign in under ⚡ App → Cloud sync so Claude can save the course into your app.', 8000);
+    const r = await LG.GH.requestCourse(ask, level, perDay);
+    await patch('courses', id, {requestUrl: r.url || '', requestNo: r.number || null, requestedAt: nowIso(), via: 'claude-github'});
+    toast(r.number ? 'Sent to Claude as #' + r.number + '. The course appears in about 5–10 minutes.' : 'Press “Submit new issue” on GitHub to send it to Claude.', 8000);
+  } catch(e){ console.warn(e); await patch('courses', id, {requestUrl: 'https://github.com/' + LG.GH.repo() + '/issues'}); toast((e && e.message) || 'Could not send the request to GitHub. The morning run will still write it.', 8000); }
 }
 async function draftCourse(id, ask, level, perDay){
   if (!S.sample) { await patch('courses', id, {status:'finding', title: ask.slice(0,80)}); kick(); return; }
@@ -1170,7 +1182,7 @@ renderers.push(function courses_(){
       <h2>${esc(c.title || c.ask)}</h2>${c.summary ? `<p class="muted">${esc(c.summary)}</p>` : ''}
       <div class="bar"><i style="width:${Math.round(p.pct*100)}%"></i></div>
       <div class="row" style="margin-top:6px">${p.total ? `<button class="btn primary" id="cSched">Add to my plan</button>` : ''}<button class="btn" id="cAsk">Ask Jarvis about it</button><button class="btn" id="cBattle">⚔ Training sim</button><button class="btn" id="cLab">🧪 Neural Lab</button><button class="btn" id="cAtt">🔍 Attention</button>${c.status === 'failed' ? `<button class="btn" id="cRetry">Find videos again</button>` : ''}<button class="btn ghost" id="cDel">Delete</button></div></div>
-    ${busy ? (c.status === 'drafting' ? `<div class="status"><span class="spin"></span><span>Jarvis is drafting the syllabus…</span></div>` : m.courseTriggerId ? `<div class="status"><span class="spin"></span><span>Claude is finding the real YouTube videos and writing notes. This takes about 5–10 minutes after you create a course, or happens at the next morning run. Until then, each slot links to a YouTube search.</span></div>` : `<div class="status"><span>Each slot below opens a YouTube search for that lesson. Automatic video finding is not switched on yet.</span></div>`) : ''}
+    ${busy ? (c.status === 'drafting' ? (window.LG && !LG.ARTIFACT ? `<div class="status"><span class="spin"></span><span>Claude is writing this course through GitHub (usually 5–10 minutes). ${c.requestUrl && !c.requestNo ? `<a href="${esc(safeUrl(c.requestUrl))}" target="_blank" rel="noopener">Open the request on GitHub</a> and press Submit new issue if you have not yet. ` : ''}It also gets written at the next morning run.</span></div>` : `<div class="status"><span class="spin"></span><span>Jarvis is drafting the syllabus…</span></div>`) : m.courseTriggerId ? `<div class="status"><span class="spin"></span><span>Claude is finding the real YouTube videos and writing notes. This takes about 5–10 minutes after you create a course, or happens at the next morning run. Until then, each slot links to a YouTube search.</span></div>` : `<div class="status"><span>Each slot below opens a YouTube search for that lesson. Automatic video finding is not switched on yet.</span></div>`) : ''}
     ${c.status === 'failed' && c.error ? `<div class="status" style="border-color:var(--crit)">${esc(c.error)}</div>` : ''}
     ${(c.outcomes||[]).length ? `<div class="card" style="margin-top:14px"><div class="label">After this course you can</div><ul style="margin:8px 0 0;padding-left:20px">${c.outcomes.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>` : ''}
     ${(c.modules||[]).map((mo, mi) => `<div class="mod"><h4><span class="n">${pad(mi+1)}</span>${esc(mo.t)}</h4>${mo.goal ? `<p>${esc(mo.goal)}</p>` : ''}

@@ -180,3 +180,16 @@ test('a rejected key shows the provider message', async () => {
   const s = await win.claude.use('sample');
   await assert.rejects(s('x'), (e) => e.code === 'bad_key' && /Invalid API Key/.test(e.text) && /Groq/.test(e.text));
 });
+
+test('a course request goes to GitHub as a "Course:" issue (API with a token, prefilled link without)', async () => {
+  let call;
+  const a = boot({ fetch: async (u, o) => { call = { u, body: JSON.parse(o.body) }; return jsonRes({ number: 9, html_url: 'https://github.com/me/repo/issues/9' }); } });
+  a.win.LG.GH.setToken('tok');
+  const r = await a.win.LG.GH.requestCourse('  Build\n an LLM   from scratch ', 'beginner', 30);
+  assert.equal(r.number, 9); assert.equal(call.u, 'https://api.github.com/repos/me/repo/issues');
+  assert.equal(call.body.title, 'Course: Build an LLM from scratch');
+  assert.doesNotMatch(call.body.body, /Sent from the app/, 'must not be mistaken for a feature request');
+  const b = boot();
+  const r2 = await b.win.LG.GH.requestCourse('RAG basics', 'intermediate', 45);
+  assert.equal(r2.link, true); assert.match(r2.url, /issues\/new\?title=Course%3A%20RAG%20basics/); assert.equal(b.opened.length, 1);
+});

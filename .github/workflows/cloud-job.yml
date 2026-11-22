@@ -5,12 +5,16 @@
 #   CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) or ANTHROPIC_API_KEY
 #   SUPABASE_URL, SUPABASE_SERVICE_KEY (service_role key). LG_USER_ID only if several users exist.
 #
-# Triggers: every morning 06:30 IST, the app (⚡ App > Builder > Run … now, or Jarvis), or Actions > Run workflow.
+# Triggers: every morning 06:30 IST; a new course (the app opens an issue titled "Course: …", opened by the repo owner);
+# the app (⚡ App > Builder > Run … now); or Actions > Run workflow.
+# Courses are always written by Claude Code here, never by an AI key in the app.
 name: Cloud job
 
 on:
   schedule:
     - cron: '0 1 * * *'
+  issues:
+    types: [opened]
   workflow_dispatch:
     inputs:
       kind:
@@ -20,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: cloud-job
@@ -27,13 +32,17 @@ concurrency:
 
 jobs:
   run:
+    # for issues: only the owner's "Course: …" requests (the issue text itself is never given to Claude)
+    if: github.event_name != 'issues' || (startsWith(github.event.issue.title, 'Course:') && github.event.issue.author_association == 'OWNER')
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
       LG_USER_ID: ${{ secrets.LG_USER_ID }}
-      KIND: ${{ inputs.kind || 'daily' }}
+      KIND: ${{ inputs.kind || (github.event_name == 'issues' && 'courses') || 'daily' }}
+      GH_TOKEN: ${{ github.token }}
+      ISSUE: ${{ github.event.issue.number }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,7 +73,7 @@ jobs:
             PROMPT="$(cat jobs/daily.md)
 
           ## This run
-          Only do step 1 (courses waiting for videos), then step 5 with a one-line digest about the courses. Today is $TODAY."
+          Only do steps 0 and 1 (write courses that are still drafts, then find their videos), then step 5 with a one-line digest about the courses. Today is $TODAY."
           else
             PROMPT="$(cat jobs/daily.md)
 
@@ -76,3 +85,14 @@ jobs:
             --allowedTools 'Read,Grep,Glob,Write,WebSearch,WebFetch,Bash(node scripts/db.mjs:*),Bash(cat:*),Bash(ls:*),Bash(date:*),Bash(mktemp:*),Bash(rm /tmp/*)' \
             | tee "$RUNNER_TEMP/out.md"
           echo "### Cloud job ($KIND)" >> "$GITHUB_STEP_SUMMARY"; tail -c 4000 "$RUNNER_TEMP/out.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report on the course request
+        if: github.event_name == 'issues' && always()
+        env:
+          RESULT: ${{ job.status }}
+        run: |
+          if [ "$RESULT" = "success" ]; then
+            gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "✅ Claude wrote the course and saved it to your app. Open the app (it syncs on open) and look under Courses. [Run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" && gh issue close "$ISSUE" -R "$GITHUB_REPOSITORY" || true
+          else
+            gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "⚠️ Claude could not finish this course. See the [run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID); the morning run will try again." || true
+          fi
