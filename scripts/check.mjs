@@ -24,7 +24,9 @@ for (const f of readdirSync('app').filter((f) => f.endsWith('.js'))) {
 }
 
 const order = ['config.js', 'lg-store.js', 'lg-runtime.js'].map((s) => html.indexOf(`src="${s}"`));
-const main = html.search(/<script>\s*\(\(\)\s*=>|<script>\s*\(function|<script>\s*\n/);
+// the main app script is the largest inline one (small inline scripts in <head>, like the theme setter, are fine)
+const inl = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].sort((x, y) => y[1].length - x[1].length)[0];
+const main = inl ? inl.index : -1;
 if (order.some((i) => i < 0)) fail('index.html must load config.js, lg-store.js and lg-runtime.js');
 else if (!(order[0] < order[1] && order[1] < order[2] && (main < 0 || order[2] < main))) fail('runtime scripts must load in order before the main inline script');
 else ok('runtime scripts load before the app');

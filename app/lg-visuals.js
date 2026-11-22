@@ -1,6 +1,6 @@
 /* Learning Galaxy — signature visuals.
- *  - Galaxy (Skill Map tab): a realistic spiral galaxy. Each subject is an arm; your topics are named stars.
- *    Mastered topics sit near the bright core, learning ones mid-arm (pulsing), bucket further out, AI suggestions faint at the rim.
+ *  - Skill chart (Skill Map tab): a radar-style star chart; sectors = subjects, rings = stage (mastered at the centre).
+ *  - Jarvis sonar core (Jarvis panel): rotating rings that react to listening / thinking / speaking.
  *  - Radar (Radar tab): a sweeping radar. News items are blips; sector = kind (launch, repo, paper, article, practice),
  *    distance from the centre = age. Blips flash as the beam passes. "Target lock" = the newest item tied to what you study.
  * Both read the on-device store (LG.store) live and only animate while their tab is on screen. */
@@ -49,105 +49,120 @@
   }
 
   /* =====================================================================
-   * GALAXY
+   * SKILL CHART (Skill Map tab): your topics on a radar-style star chart
+   * sectors = subjects, rings = stage (mastered at the centre → suggestions at the rim)
    * ===================================================================== */
+  const BANDS = [['learned', 'Mastered', 0.1, 0.3], ['learning', 'Learning', 0.3, 0.5], ['todo', 'Bucket', 0.5, 0.76], ['suggested', 'Suggested', 0.76, 0.96]];
   function mountGalaxy() {
     const view = document.getElementById('v-galaxy'); if (!view || view.querySelector('.lgv-gx')) return;
     const el = document.createElement('div'); el.className = 'lgv lgv-gx space';
-    el.innerHTML = '<canvas aria-label="Your learning galaxy: drag to turn, scroll to zoom, tap a star to open the topic"></canvas><div class="lgv-hd"><h3>Your galaxy</h3><p id="gxHint"></p></div><div class="lgv-tip"></div><div class="lgv-key" id="gxKey"></div>';
+    el.innerHTML = '<canvas aria-label="Skill chart: your topics by subject and stage. Tap a dot to open the topic."></canvas><div class="lgv-hd"><h3>Skill chart</h3><p id="gxHint"></p></div><a class="lgv-lock" id="gxLock" hidden></a><div class="lgv-tip"></div><div class="lgv-key" id="gxKey"></div>';
     view.insertBefore(el, view.firstChild);
-    const tip = el.querySelector('.lgv-tip');
-
-    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-    const mix = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
-    const ARMS = 2, PITCH = 0.42; const armAngle = (r) => Math.log(r / 0.07) / Math.tan(PITCH);
-    const big = innerWidth * innerHeight > 900000;
-    const N = big ? 26000 : 11000, BULGE = big ? 6000 : 2800, GAS = big ? 1400 : 700, DUSTN = big ? 2400 : 1100;
-    const stars = [];
-    for (let i = 0; i < N; i++) { const r = Math.min(1, 0.05 + -Math.log(1 - rnd() * 0.97) * 0.27); const arm = Math.floor(rnd() * ARMS); const sp = (0.22 + 0.55 * (1 - r)) * (rnd() < 0.55 ? 0.42 : 1.6);
-      let col = mix([255, 228, 190], [170, 205, 255], Math.min(1, r / 0.85)); if (rnd() < 0.15) col = mix(col, [255, 255, 255], 0.6);
-      stars.push([r, armAngle(r) + arm * Math.PI + gauss() * sp, gauss() * 0.02 * (1.3 - r), rnd() < 0.05 ? 1.7 : 1, `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`, 0.3 + rnd() * 0.55, 0]); }
-    for (let i = 0; i < BULGE; i++) stars.push([Math.abs(gauss()) * 0.14, rnd() * 6.283, gauss() * 0.05, 1, `rgb(255,${(215 + rnd() * 30) | 0},${(170 + rnd() * 40) | 0})`, 0.18 + rnd() * 0.3, 0]);
-    for (let i = 0; i < GAS; i++) { const r = 0.08 + rnd() * 0.92, arm = Math.floor(rnd() * ARMS); stars.push([r, armAngle(r) + arm * Math.PI + gauss() * (0.25 + 0.3 * (1 - r)), 0, 1, '', 0.04 + rnd() * 0.05, 2]); }
-    const dust = []; for (let i = 0; i < DUSTN; i++) { const r = 0.12 + rnd() * 0.8, arm = Math.floor(rnd() * ARMS); dust.push([r, armAngle(r) + arm * Math.PI - 0.22 + gauss() * 0.06, gauss() * 0.01, 2.2 + rnd() * 2.5, 0.08 + rnd() * 0.08]); }
-    const sky = Array.from({ length: big ? 700 : 300 }, () => [rnd(), rnd(), rnd() * 1.1 + 0.2, rnd() * 0.6 + 0.15, rnd() * 6.28]);
-    const sprite = (rgb, size, core = 1) => { const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d'); const gr = x.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-      gr.addColorStop(0, `rgba(255,255,255,${core})`); gr.addColorStop(0.15, `rgba(${rgb},0.9)`); gr.addColorStop(0.45, `rgba(${rgb},0.25)`); gr.addColorStop(1, `rgba(${rgb},0)`); x.fillStyle = gr; x.fillRect(0, 0, size, size); return c; };
-    const GASS = sprite('120,160,255', 64, 0.6);
-    const DUSTS = (() => { const c = document.createElement('canvas'); c.width = c.height = 32; const x = c.getContext('2d'); const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(4,2,10,1)'); gr.addColorStop(1, 'rgba(4,2,10,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32); return c; })();
-    const spriteCache = new Map(); const spr = (rgb) => { const k = rgb.join(','); if (!spriteCache.has(k)) spriteCache.set(k, sprite(k, 64)); return spriteCache.get(k); };
-
-    // topics → named stars
-    let topics = [], cats = [];
-    const ZONE = { learned: [0.14, 0.34], learning: [0.34, 0.58], todo: [0.56, 0.86], suggested: [0.8, 0.98] };
+    const tip = el.querySelector('.lgv-tip'), lock = el.querySelector('#gxLock');
+    let dots = [], cats = [], beam = 0, mouse = { x: -1, y: -1 }, hover = null;
     function rebuild() {
-      cats = [...data.categories.values()].sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
-      const ci = new Map(cats.map((c, i) => [c.id, i]));
-      topics = [...data.topics.values()].filter((t) => !t.hidden).map((t) => {
-        const st = ZONE[t.status] ? t.status : 'todo'; const i = ci.has(t.cat) ? ci.get(t.cat) : 0; const h = hash(t.id), h2 = hash(t.id + '*');
-        const [a, b] = ZONE[st]; const r = a + (b - a) * h;
-        const arm = i % ARMS; const side = (Math.floor(i / ARMS) % 2 ? 0.32 : -0.06) + (h2 - 0.5) * 0.22;
-        return { id: t.id, name: t.title || 'Untitled', st, cat: (cats[i] && cats[i].name) || 'Other', col: PAL[i % PAL.length], r, th: armAngle(r) + arm * Math.PI + side };
+      cats = [...data.categories.values()].sort((a, b) => (a.order ?? 99) - (b.order ?? 99)); if (!cats.length) cats = [{ id: 'all', name: 'Topics' }];
+      const ci = new Map(cats.map((c, i) => [c.id, i])); const n = cats.length;
+      dots = [...data.topics.values()].filter((t) => !t.hidden).map((t) => {
+        const band = BANDS.find((b) => b[0] === t.status) || BANDS[2]; const i = ci.has(t.cat) ? ci.get(t.cat) : 0;
+        const h = hash(t.id), h2 = hash(t.id + '#');
+        return { id: t.id, name: t.title || 'Untitled', st: band[0], stage: band[1], cat: cats[i].name, col: PAL[i % PAL.length],
+          ang: (i + 0.08 + h * 0.84) / n * 6.283, rad: band[2] + (band[3] - band[2]) * (0.12 + h2 * 0.76), lit: 0 };
       });
-      const n = (s) => topics.filter((t) => t.st === s).length;
-      el.querySelector('#gxHint').textContent = `${topics.length} topics · ${n('learned')} mastered · ${n('learning')} learning now · drag to turn, tap a star`;
-      el.querySelector('#gxKey').innerHTML = cats.slice(0, 6).map((c, i) => `<span style="color:rgb(${PAL[i % PAL.length].join(',')})"><i style="background:rgb(${PAL[i % PAL.length].join(',')})"></i>${esc(c.name)}</span>`).join('');
+      const c = (s) => dots.filter((d) => d.st === s).length;
+      el.querySelector('#gxHint').textContent = `${dots.length} topics · ${c('learned')} mastered · ${c('learning')} learning · tap a dot to open it`;
+      el.querySelector('#gxKey').innerHTML = cats.slice(0, 6).map((k, i) => `<span style="color:rgb(${PAL[i % PAL.length].join(',')})"><i style="background:rgb(${PAL[i % PAL.length].join(',')})"></i>${esc(k.name)}</span>`).join('');
+      const cur = dots.find((d) => d.st === 'learning');
+      if (cur) { lock.hidden = false; lock.href = '#'; lock.innerHTML = `<small>LEARNING NOW · ${esc(cur.cat)}</small><b>${esc(cur.name)}</b>Tap to open`; lock.onclick = (e) => { e.preventDefault(); window.LGApp && window.LGApp.openTopic(cur.id); }; } else lock.hidden = true;
     }
     subs.push((c) => (c === 'topics' || c === 'categories') && rebuild());
-
-    // camera + input
-    let yaw = 0.4, tilt = 0.95, zoom = 1, spin = 0, drag = null, mouse = { x: -1, y: -1 }, hover = null, moved = 0;
     const cv = canvasLoop(el, draw);
-    cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw, tilt }; moved = 0; el.classList.add('drag'); cv.setPointerCapture(e.pointerId); });
-    cv.addEventListener('pointermove', (e) => { const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top }; if (!drag) return; moved += Math.abs(e.movementX) + Math.abs(e.movementY); yaw = drag.yaw + (e.clientX - drag.x) * 0.005; tilt = Math.max(0.2, Math.min(1.4, drag.tilt + (e.clientY - drag.y) * 0.004)); });
-    cv.addEventListener('pointerup', () => { const wasDrag = moved > 6; drag = null; el.classList.remove('drag'); if (!wasDrag && hover && window.LGApp && window.LGApp.openTopic) window.LGApp.openTopic(hover.id); });
+    cv.addEventListener('pointermove', (e) => { const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top }; });
     cv.addEventListener('pointerleave', () => { mouse = { x: -1, y: -1 }; });
-    cv.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.6, Math.min(2.6, zoom * Math.exp(-e.deltaY * 0.0012))); }, { passive: false });
-
-    function project(r, th, z, rot, scale, cx, cy) {
-      const a = th + rot; let x = Math.cos(a) * r, y = Math.sin(a) * r; const cY = Math.cos(yaw), sY = Math.sin(yaw); [x, y] = [x * cY - y * sY, x * sY + y * cY];
-      const cT = Math.cos(tilt), sT = Math.sin(tilt); const y2 = y * cT - z * sT, z2 = y * sT + z * cT; const p = 2.6 / (2.6 + z2); return [cx + x * scale * p, cy + y2 * scale * p, p];
-    }
+    cv.addEventListener('click', () => { if (hover && window.LGApp) window.LGApp.openTopic(hover.id); });
     function draw(g, W, H, now, dt) {
-      spin += dt; const cx = W / 2, cy = H / 2 + 14, scale = Math.min(W * 0.62, H * 0.95) * 0.62 * zoom; const rotOf = (r) => spin * 0.05 / Math.max(0.12, r);
-      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.fillStyle = '#01020a'; g.fillRect(0, 0, W, H);
-      g.fillStyle = '#dfe8ff'; for (const [x, y, s, a, ph] of sky) { g.globalAlpha = a * (0.65 + 0.35 * Math.sin(now / 900 + ph * 3)); g.fillRect(x * W, y * H, s, s); }
-      g.globalCompositeOperation = 'lighter';
-      const [ccx, ccy] = project(0, 0, 0, 0, scale, cx, cy); const cg = g.createRadialGradient(ccx, ccy, 0, ccx, ccy, scale * 0.42);
-      cg.addColorStop(0, 'rgba(255,236,212,.6)'); cg.addColorStop(0.1, 'rgba(255,200,140,.28)'); cg.addColorStop(0.4, 'rgba(120,120,255,.12)'); cg.addColorStop(1, 'rgba(0,0,0,0)');
-      g.save(); g.translate(ccx, ccy); g.scale(1, Math.max(0.25, Math.cos(tilt) * 0.9 + 0.1)); g.translate(-ccx, -ccy); g.globalAlpha = 1; g.fillStyle = cg; g.beginPath(); g.arc(ccx, ccy, scale * 0.42, 0, 7); g.fill(); g.restore();
-      const zs = Math.min(1.6, zoom);
-      for (const s of stars) {
-        const [x, y, p] = project(s[0], s[1], s[2], rotOf(s[0]), scale, cx, cy); if (x < -40 || y < -40 || x > W + 40 || y > H + 40) continue;
-        g.globalAlpha = s[5];
-        if (s[6] === 2) { const sz = 52 * p * zoom; g.globalAlpha = s[5] * 0.8; g.drawImage(GASS, x - sz / 2, y - sz / 2, sz, sz); continue; }
-        g.fillStyle = s[4]; const sz = s[3] * p * zs; g.fillRect(x, y, sz, sz);
+      const cx = W / 2, cy = H / 2 + 14, R = Math.min(W, H) * 0.42; beam = (beam + dt * 0.7) % 6.283;
+      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+      const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); bg.addColorStop(0, '#0b2a4a'); bg.addColorStop(0.45, '#041326'); bg.addColorStop(1, '#01040c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      // stage rings + labels
+      g.font = '500 10px "JetBrains Mono", monospace';
+      for (const [, label, , outer] of BANDS) { g.strokeStyle = 'rgba(94,200,255,.2)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, outer * R, 0, 7); g.stroke(); g.fillStyle = 'rgba(143,200,240,.55)'; g.fillText(label.toUpperCase(), cx + 6, cy - outer * R + 12); }
+      g.strokeStyle = 'rgba(94,200,255,.5)'; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+      for (let i = 0; i < 120; i++) { const a = i / 120 * 6.283, L = i % 10 ? 3 : 8; g.strokeStyle = 'rgba(94,200,255,.4)'; g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + L), cy + Math.sin(a) * (R + L)); g.stroke(); }
+      // subject sectors + names at the rim
+      const n = cats.length;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * 6.283 - Math.PI / 2; g.strokeStyle = 'rgba(94,200,255,.12)'; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke();
+        const m = (i + 0.5) / n * 6.283 - Math.PI / 2; const lx = cx + Math.cos(m) * (R + 22), ly = cy + Math.sin(m) * (R + 22);
+        g.fillStyle = `rgba(${PAL[i % PAL.length].join(',')},.9)`; g.font = '600 12px Manrope, system-ui'; g.textAlign = Math.cos(m) > 0.2 ? 'left' : Math.cos(m) < -0.2 ? 'right' : 'center'; g.fillText(cats[i].name, lx, ly + 4); g.textAlign = 'left';
       }
-      g.globalCompositeOperation = 'source-over';
-      for (const d of dust) { const [x, y, p] = project(d[0], d[1], d[2], rotOf(d[0]), scale, cx, cy); g.globalAlpha = d[4] * 1.6; const sz = d[3] * 3 * p * zoom; g.drawImage(DUSTS, x - sz / 2, y - sz / 2, sz, sz); }
-      // topics
-      g.globalCompositeOperation = 'lighter'; hover = null; let best = 16;
-      for (const t of topics) {
-        const [x, y, p] = project(t.r, t.th, 0.01, rotOf(t.r), scale, cx, cy); t.sx = x; t.sy = y;
-        const base = t.st === 'learned' ? 30 : t.st === 'learning' ? 26 : t.st === 'todo' ? 17 : 11;
-        const pulse = t.st === 'learning' ? 1 + 0.25 * Math.sin(now / 350 + t.r * 20) : 1;
-        const sz = base * p * pulse * Math.min(1.5, Math.sqrt(zoom)); const d = Math.hypot(mouse.x - x, mouse.y - y);
-        g.globalAlpha = t.st === 'suggested' ? 0.4 : t.st === 'todo' ? 0.8 : 1; if (d < 22) g.globalAlpha = 1;
-        g.drawImage(spr(t.col), x - sz / 2, y - sz / 2, sz, sz); if (d < best) { best = d; hover = t; }
+      // sweep
+      g.save(); g.translate(cx, cy); g.rotate(beam - Math.PI / 2);
+      if (g.createConicGradient) { const sw = g.createConicGradient(0, 0, 0); sw.addColorStop(0, 'rgba(94,200,255,0)'); sw.addColorStop(0.8, 'rgba(94,200,255,0)'); sw.addColorStop(0.97, 'rgba(94,200,255,.14)'); sw.addColorStop(1, 'rgba(140,225,255,.4)'); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); }
+      g.strokeStyle = 'rgba(190,240,255,.8)'; g.lineWidth = 1.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(R, 0); g.stroke(); g.restore();
+      // topic dots
+      hover = null; let best = 12;
+      for (const d of dots) {
+        const a = d.ang - Math.PI / 2; const x = cx + Math.cos(a) * d.rad * R, y = cy + Math.sin(a) * d.rad * R; d.x = x; d.y = y;
+        let diff = (beam - d.ang) % 6.283; if (diff < 0) diff += 6.283; if (diff < 0.06) d.lit = 1; d.lit = Math.max(0, d.lit - dt * 0.35);
+        const base = d.st === 'learned' ? 4.6 : d.st === 'learning' ? 4.8 : d.st === 'todo' ? 3.2 : 2.4;
+        const alpha = d.st === 'suggested' ? 0.35 : d.st === 'todo' ? 0.65 : 1;
+        const dd = Math.hypot(mouse.x - x, mouse.y - y); if (dd < best) { best = dd; hover = d; }
+        g.globalAlpha = Math.min(1, alpha + d.lit * 0.6); g.fillStyle = `rgb(${d.col.join(',')})`; g.shadowColor = g.fillStyle; g.shadowBlur = (d.st === 'learned' ? 10 : 4) + 14 * d.lit;
+        g.beginPath(); g.arc(x, y, base + 1.5 * d.lit, 0, 7); g.fill(); g.shadowBlur = 0;
+        if (d.st === 'learning') { const k = (now / 1500 + d.rad) % 1; g.globalAlpha = 0.7 * (1 - k); g.strokeStyle = g.fillStyle; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y, 6 + k * 14, 0, 7); g.stroke(); }
       }
-      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-      const cur = topics.find((t) => t.st === 'learning');
-      if (cur && cur.sx != null) { const k = (now / 1600) % 1; g.strokeStyle = `rgba(${cur.col.join(',')},${0.6 * (1 - k)})`; g.lineWidth = 1.2; g.beginPath(); g.arc(cur.sx, cur.sy, 8 + k * 18, 0, 7); g.stroke(); }
-      const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.65)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+      g.globalAlpha = 1; g.fillStyle = '#fff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 16; g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fill(); g.shadowBlur = 0;
       if (hover) {
-        g.strokeStyle = `rgba(${hover.col.join(',')},.9)`; g.lineWidth = 1.5; g.beginPath(); g.arc(hover.sx, hover.sy, 13, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
-        const label = { learned: 'Mastered', learning: 'Learning now', todo: 'In your bucket', suggested: 'Suggested' }[hover.st];
-        tip.style.display = 'block'; tip.style.left = Math.min(hover.sx, W - 270) + 'px'; tip.style.top = hover.sy + 'px';
-        tip.innerHTML = `<small style="color:rgb(${hover.col.join(',')})">${esc(hover.cat)} · ${label}</small><b>${esc(hover.name)}</b>Tap to open`;
+        g.strokeStyle = `rgb(${hover.col.join(',')})`; g.lineWidth = 1.4; g.beginPath(); g.arc(hover.x, hover.y, 10, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
+        tip.style.display = 'block'; tip.style.left = Math.min(hover.x, W - 265) + 'px'; tip.style.top = hover.y + 'px';
+        tip.innerHTML = `<small style="color:rgb(${hover.col.join(',')})">${esc(hover.cat)} · ${hover.stage}</small><b>${esc(hover.name)}</b>Tap to open`;
       } else { tip.style.display = 'none'; cv.style.cursor = ''; }
     }
     rebuild();
+  }
+
+  /* =====================================================================
+   * JARVIS SONAR CORE: rotating rings and ticks; reacts to listening / thinking / speaking
+   * ===================================================================== */
+  function mountJarvisCore() {
+    const log = document.getElementById('jLog'); if (!log || document.querySelector('.j-core')) return;
+    const el = document.createElement('div'); el.className = 'j-core'; el.innerHTML = '<canvas aria-hidden="true"></canvas><div class="st" id="jcSt">Online</div>';
+    log.parentNode.insertBefore(el, log);
+    const st = el.querySelector('#jcSt'); let energy = 0.2, t = 0, mode = 'idle';
+    const rings = [[0.34, 0.5, 0, 40], [0.5, -0.3, 6, 0], [0.66, 0.18, 0, 90], [0.82, -0.12, 14, 0], [0.98, 0.06, 0, 160]];
+    canvasLoop(el, (g, W, H, now, dt) => {
+      t += dt; const orb = document.getElementById('orb'); const sub = (document.getElementById('jSub') || {}).textContent || '';
+      mode = /Speaking/i.test(sub) ? 'speaking' : /Listening/i.test(sub) ? 'listening' : (orb && orb.classList.contains('busy')) || /Thinking/i.test(sub) ? 'thinking' : 'idle';
+      st.textContent = { idle: 'Online', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' }[mode];
+      energy += ({ idle: 0.2, listening: 0.55, thinking: 0.9, speaking: 0.65 }[mode] - energy) * Math.min(1, dt * 3);
+      const voice = mode === 'speaking' ? Math.abs(Math.sin(t * 9) * Math.sin(t * 3.1)) : mode === 'listening' ? Math.abs(Math.sin(t * 5) * Math.sin(t * 1.7)) : 0;
+      const cx = W / 2, cy = H / 2 - 6, R = Math.min(W, H) * 0.4; const sp = 0.5 + energy * 2.2;
+      g.clearRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+      const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.2); cg.addColorStop(0, `rgba(94,200,255,${0.12 + energy * 0.12 + voice * 0.15})`); cg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = cg; g.fillRect(0, 0, W, H);
+      // rings: solid, dashed, or tick rings, each turning at its own speed
+      rings.forEach(([rr, speed, dash, ticks], i) => {
+        const rad = rr * R * (1 + (i === 2 ? voice * 0.08 : 0)); const rot = t * speed * sp;
+        g.save(); g.translate(cx, cy); g.rotate(rot); g.strokeStyle = `rgba(94,200,255,${0.25 + 0.25 * energy})`; g.lineWidth = i === 4 ? 1.2 : 1;
+        if (ticks) { for (let k = 0; k < ticks; k++) { const a = k / ticks * 6.283, L = k % 10 ? 3 : 7; g.beginPath(); g.moveTo(Math.cos(a) * rad, Math.sin(a) * rad); g.lineTo(Math.cos(a) * (rad - L), Math.sin(a) * (rad - L)); g.stroke(); } }
+        else { g.setLineDash([dash, dash]); g.beginPath(); g.arc(0, 0, rad, 0, 7); g.stroke(); g.setLineDash([]); }
+        // a bright arc segment on each ring
+        g.strokeStyle = `rgba(160,230,255,${0.5 + 0.4 * energy})`; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, rad, 0, 0.5 + i * 0.15); g.stroke();
+        g.restore();
+      });
+      // voice ring: a waveform around the core
+      g.strokeStyle = `rgba(190,240,255,${0.5 + voice * 0.5})`; g.lineWidth = 1.5; g.beginPath();
+      for (let k = 0; k <= 96; k++) { const a = k / 96 * 6.283; const w = 1 + (voice * 0.22 + 0.02) * Math.sin(a * 8 + t * 10) * Math.sin(a * 3 - t * 4); const x = cx + Math.cos(a) * R * 0.22 * w, y = cy + Math.sin(a) * R * 0.22 * w; k ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke();
+      // sweep
+      g.save(); g.translate(cx, cy); g.rotate(t * sp * 1.4);
+      if (g.createConicGradient) { const sw = g.createConicGradient(0, 0, 0); sw.addColorStop(0, 'rgba(94,200,255,0)'); sw.addColorStop(0.82, 'rgba(94,200,255,0)'); sw.addColorStop(1, `rgba(140,225,255,${0.25 + energy * 0.25})`); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R * 0.98, 0, 7); g.fill(); }
+      g.restore();
+      // thinking: scanning arc
+      if (mode === 'thinking') { const a = t * 4; g.strokeStyle = 'rgba(200,245,255,.9)'; g.lineWidth = 2.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 12; g.beginPath(); g.arc(cx, cy, R * 0.66, a, a + 0.9); g.stroke(); g.shadowBlur = 0; }
+      // core
+      g.fillStyle = '#e6f8ff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 18 + voice * 20; g.beginPath(); g.arc(cx, cy, 3.5 + voice * 3, 0, 7); g.fill(); g.shadowBlur = 0;
+    });
   }
 
   /* =====================================================================
@@ -221,7 +236,9 @@
 
   LG.store.ready.then(() => {
     watch('categories'); watch('topics'); watch('news', LG.store.db.collection('news').orderBy('date', 'desc').limit(80));
-    const go = () => { mountGalaxy(); mountRadar(); };
+    const safe = (fn) => { try { fn(); } catch (e) { console.warn('lg-visuals', e); } };
+    const go = () => { safe(mountJarvisCore); safe(mountGalaxy); safe(mountRadar); };
+    setInterval(() => { if (!document.querySelector('.j-core')) safe(mountJarvisCore); }, 2000);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go); else go();
   });
 })();

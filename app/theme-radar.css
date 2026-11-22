@@ -1,0 +1,60 @@
+/* Learning Galaxy — RADAR THEME (v4)
+ * The whole app speaks the radar's language: deep navy sea, cyan hairlines, rings and ticks,
+ * small mono readout labels, a slow sweep motif. Loaded after theme.css. Dark theme only;
+ * the light theme keeps theme.css styling. */
+
+:root:not([data-theme="light"]) { --f-mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace; }
+@media (prefers-color-scheme: light) { html:not([data-theme]) { --rdr-off:1; } }
+
+html:not([data-theme="light"]) body{background:radial-gradient(1100px 700px at 50% -10%,#0b2a4a 0%,#041326 45%,#01040c 85%) fixed}
+html:not([data-theme="light"]) #bgfx{display:none}
+/* faint radar rings + a slow sweep behind the whole app */
+html:not([data-theme="light"]) body::after{content:"";position:fixed;right:-32vmax;top:-32vmax;width:90vmax;height:90vmax;border-radius:50%;pointer-events:none;z-index:0;
+  background:repeating-radial-gradient(circle,transparent 0 calc(9vmax - 1px),rgb(94 200 255 / .06) calc(9vmax - 1px) 9vmax),conic-gradient(from 0deg,transparent 0 300deg,rgb(94 200 255 / .06) 350deg,rgb(94 200 255 / .13) 360deg);
+  animation:lg-sweep 16s linear infinite}
+@keyframes lg-sweep{to{transform:rotate(360deg)}}
+
+/* surfaces: glassy navy with a cyan hairline */
+html:not([data-theme="light"]) .card,html:not([data-theme="light"]) .hudf{background:linear-gradient(180deg,rgb(94 200 255 / .045),rgb(94 200 255 / .01) 40%),rgb(4 19 38 / .78);border:1px solid rgb(94 200 255 / .16);box-shadow:inset 0 1px 0 rgb(143 220 255 / .06),0 20px 40px -28px rgb(0 0 0 / .8);backdrop-filter:blur(6px)}
+html:not([data-theme="light"]) .sm-lane,html:not([data-theme="light"]) .sm-sub,html:not([data-theme="light"]) .ov-spec,html:not([data-theme="light"]) .ov-shelf,html:not([data-theme="light"]) .rd-card,html:not([data-theme="light"]) .ov-now,html:not([data-theme="light"]) details.acc,html:not([data-theme="light"]) .vid,html:not([data-theme="light"]) .stat,html:not([data-theme="light"]) .wd{background:rgb(4 19 38 / .7);border-color:rgb(94 200 255 / .15)}
+
+/* labels read like radar readouts */
+html:not([data-theme="light"]) .label,html:not([data-theme="light"]) .stat span{font-family:var(--f-mono)!important;font-size:11px!important;letter-spacing:.08em!important;text-transform:uppercase!important;color:var(--accent)!important;opacity:.85}
+
+/* controls */
+html:not([data-theme="light"]) .btn{background:rgb(94 200 255 / .06);border-color:rgb(94 200 255 / .22);color:var(--fg)}
+html:not([data-theme="light"]) .btn:hover{border-color:var(--accent);background:rgb(94 200 255 / .1)}
+html:not([data-theme="light"]) .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent;box-shadow:0 0 0 1px rgb(143 220 255 / .4),0 8px 24px -10px rgb(94 200 255 / .8)}
+html:not([data-theme="light"]) .btn.ghost{background:transparent;border-color:transparent;color:var(--accent)}
+html:not([data-theme="light"]) .iconbtn{background:rgb(94 200 255 / .05);border-color:rgb(94 200 255 / .18)}
+html:not([data-theme="light"]) .inp{background:rgb(2 12 28 / .8);border-color:rgb(94 200 255 / .2)}
+html:not([data-theme="light"]) .tabs button.on{background:rgb(94 200 255 / .14);color:var(--accent-2);box-shadow:inset 0 0 0 1px rgb(94 200 255 / .35)}
+@media (min-width:1101px){html:not([data-theme="light"]) .top{background:rgb(2 10 24 / .72);backdrop-filter:blur(10px);border-right-color:rgb(94 200 255 / .14)}}
+@media (max-width:640px){html:not([data-theme="light"]) .tabs{background:rgb(2 10 24 / .94);border-top:1px solid rgb(94 200 255 / .18)}}
+
+/* "Up next" becomes a sonar panel with its own sweep */
+html:not([data-theme="light"]) .now,.now{background:radial-gradient(circle at 92% 50%,rgb(94 200 255 / .16),transparent 45%),repeating-radial-gradient(circle at 92% 50%,transparent 0 27px,rgb(94 200 255 / .13) 27px 28px),linear-gradient(135deg,#0b2a4a 0%,#06203d 55%,#041326 100%)!important;border:1px solid rgb(94 200 255 / .3)!important;box-shadow:0 24px 60px -30px rgb(94 200 255 / .45)!important}
+.now::after{right:-150px!important;top:50%!important;width:300px!important;height:300px!important;margin-top:-150px;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 290deg,rgb(94 200 255 / .1) 340deg,rgb(143 225 255 / .35) 360deg)!important;animation:lg-sweep 6s linear infinite}
+.now .label{color:#8FDCFF!important}
+.now .btn.primary{background:#E6F4FF!important;color:#052038!important}
+
+/* every small orb becomes a mini sonar */
+.rx{background:repeating-radial-gradient(circle,transparent 0 22%,rgb(94 200 255 / .55) 23% 25%),radial-gradient(circle,#bff0ff 0 9%,#2d8fe0 14%,#031024 60%)!important;box-shadow:0 0 0 1px rgb(94 200 255 / .5),0 0 16px rgb(94 200 255 / .35)!important;overflow:hidden}
+.rx::after{border:0!important;inset:0!important;border-radius:50%;background:conic-gradient(from 0deg,transparent 0 280deg,rgb(143 225 255 / .7) 360deg);animation:lg-sweep 2.4s linear infinite!important}
+.rx.busy::after{animation-duration:.8s!important}
+
+/* progress reads like signal strength */
+.bar{background:rgb(94 200 255 / .1)}.bar i{background:linear-gradient(90deg,#2D8FE0,#5EC8FF)!important;box-shadow:0 0 10px rgb(94 200 255 / .5)}
+
+/* jarvis */
+html:not([data-theme="light"]) .jarvis{background:linear-gradient(180deg,rgb(11 42 74 / .6),rgb(2 10 24 / .92) 45%);border-left:1px solid rgb(94 200 255 / .16)}
+html:not([data-theme="light"]) .msg.assistant{background:rgb(4 19 38 / .85);border:1px solid rgb(94 200 255 / .16)}
+html:not([data-theme="light"]) .msg.user{background:linear-gradient(135deg,#2D8FE0,#1b62b0);color:#fff}
+html:not([data-theme="light"]) .composer{background:rgb(2 10 24 / .8);border-top-color:rgb(94 200 255 / .14)}
+.j-core{position:relative;height:200px;flex:none;border-bottom:1px solid rgb(94 200 255 / .12);overflow:hidden}
+.j-core canvas{position:absolute;inset:0;width:100%;height:100%}
+.j-core .st{position:absolute;left:0;right:0;bottom:10px;text-align:center;font:500 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+@media (max-height:720px){.j-core{height:150px}}
+.j-head .rx{display:none}
+
+@media (prefers-reduced-motion:reduce){body::after,.now::after,.rx::after{animation:none!important}}

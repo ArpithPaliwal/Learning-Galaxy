@@ -7,13 +7,13 @@
 
 /* ---------- tokens ---------- */
 :root, html[data-theme="dark"] {
-  --bg:#070A14; --bg-2:#0A0F1E; --panel:#0E1428; --panel-2:#141B33; --line:#1B2444; --line-2:#2A3766;
-  --fg:#EAF0FF; --fg-2:#A9B4D6; --fg-3:#6F7BA2;
-  --accent:#4D7CFF; --accent-2:#93B2FF; --accent-ink:#FFFFFF; --deep:#2D4FE0; --ion:#5EC8FF;
-  --glow:rgb(77 124 255 / .40); --glow-soft:rgb(77 124 255 / .12);
+  --bg:#01060f; --bg-2:#031024; --panel:#06182e; --panel-2:#0a2140; --line:#11304f; --line-2:#1d4a73;
+  --fg:#E6F4FF; --fg-2:#9EC0DD; --fg-3:#5F86A8;
+  --accent:#5EC8FF; --accent-2:#8FDCFF; --accent-ink:#021424; --deep:#2D8FE0; --ion:#5EC8FF;
+  --glow:rgb(94 200 255 / .40); --glow-soft:rgb(94 200 255 / .12);
   --good:#3DDC97; --warn:#FFB547; --crit:#FF5C73;
-  --st-learned:#7FD4FF; --st-learning:#4D7CFF; --st-todo:#3A4C8F; --st-sugg:#26305A;
-  --c-acc:77 124 255; --c-ion:94 200 255; --c-deep:45 79 224; --c-crit:255 92 115; --c-s0:7 10 20; --c-s1:14 20 40;
+  --st-learned:#8FDCFF; --st-learning:#5EC8FF; --st-todo:#2D6A9A; --st-sugg:#173A5A;
+  --c-acc:94 200 255; --c-ion:94 200 255; --c-deep:45 143 224; --c-crit:255 92 115; --c-s0:1 8 20; --c-s1:6 24 46;
   --shadow:0 1px 0 rgb(255 255 255 / .03) inset, 0 12px 32px -16px rgb(0 0 0 / .6);
   --f-hud:"Space Grotesk","Manrope",system-ui,sans-serif;
   --f-label:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;

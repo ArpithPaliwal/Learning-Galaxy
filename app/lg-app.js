@@ -55,9 +55,11 @@
   const nextTheme = () => ({ system: 'light', light: 'dark', dark: 'system' })[curTheme()];
   function setTheme(t) {
     LG.cfg.set('theme', t === 'system' ? null : t);
-    if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    applyTheme();
     paintTheme(); toast(THEMES[t][1]); if (panelTab === 'home') draw();
   }
+  function applyTheme() { const t = curTheme(); document.documentElement.setAttribute('data-theme', t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t); }
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (curTheme() === 'system') applyTheme(); });
   function paintTheme() { const b = $('#lgThemeBtn'); if (!b) return; const [ic, label] = THEMES[curTheme()]; b.textContent = ic; b.title = label + ' (tap to change)'; b.setAttribute('aria-label', label); }
   function paintDot() { const d = $('#lgDot'); if (!d) return; const s = LG.Sync.state.status; d.className = 'lg-dot ' + s; d.title = { ok: 'Synced', syncing: 'Syncing…', error: 'Sync error: ' + LG.Sync.state.error, offline: 'Offline — saved on this device', signed_out: 'Sync: not signed in', off: 'Saved on this device (cloud sync off)' }[s] || s; }
   LG.bus.addEventListener('sync', () => { paintDot(); if (panelTab === 'sync') draw(); });
