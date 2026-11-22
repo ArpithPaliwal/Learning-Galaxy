@@ -1,0 +1,8 @@
+# Only what this project changes from Supabase defaults. Push with: npx supabase config push
+project_id = "learning-galaxy"
+
+[auth]
+site_url = "https://learning-galaxy-arpit.netlify.app"
+additional_redirect_urls = ["https://learning-galaxy-arpit.netlify.app/", "http://localhost:5173/"]
+
+# Email templates need a paid plan or custom SMTP on Supabase; the default magic link works with the app.

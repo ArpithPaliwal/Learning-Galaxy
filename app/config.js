@@ -3,7 +3,7 @@
 window.LG_CONFIG = {
   repo: 'ArpithPaliwal/Learning-Galaxy',
   branch: 'main',
-  supabaseUrl: '',
-  supabaseAnonKey: '',
+  supabaseUrl: 'https://aqkiczctlqpkbhzucxmp.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxa2ljemN0bHFwa2JoenVjeG1wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUzMzMyODgsImV4cCI6MjExMDkwOTI4OH0.JNb9YR4hZB3GJlBtqwG6xK3RylzeVJLQ3seMZ1Ckoeg',
 };
 window.LG_VERSION = 'dev';

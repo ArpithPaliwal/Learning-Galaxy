@@ -127,14 +127,14 @@
         <button class="btn small" id="sbSave" style="align-self:flex-start">Save project</button></div></details>
       ${LG.Sync.configured() ? (LG.Sync.signedIn()
         ? `<div class="row"><span class="faint" style="font-size:13px">Signed in as <b>${esc((ses.user || {}).email || '')}</b></span><button class="btn small ghost" id="sbOut">Sign out</button></div>`
-        : `<div class="field"><span class="label">Your email</span><div class="row"><input class="inp" id="sbE" type="email" style="flex:1 1 200px" value="${esc(LG.cfg.get('sb.email', ''))}"><button class="btn small" id="sbSend">Email me a code</button></div></div>
-           <div class="field"><span class="label">Code from the email</span><div class="row"><input class="inp" id="sbC" inputmode="numeric" style="flex:1 1 120px" placeholder="123456"><button class="btn small primary" id="sbVer">Sign in</button></div>
-           <span class="faint" style="font-size:12.5px">Got a link instead of a code? Open the link on this device; it signs you in.</span></div>`) : ''}`;
+        : `<div class="field"><span class="label">Your email</span><div class="row"><input class="inp" id="sbE" type="email" style="flex:1 1 200px" value="${esc(LG.cfg.get('sb.email', ''))}"><button class="btn small" id="sbSend">Email me a link</button></div></div>
+           <div class="field"><span class="label">Or type a code (if your email has one)</span><div class="row"><input class="inp" id="sbC" inputmode="numeric" style="flex:1 1 120px" placeholder="123456"><button class="btn small primary" id="sbVer">Sign in</button></div>
+           <span class="faint" style="font-size:12.5px">Open the link from the email on THIS device (same browser or the installed app). It signs you in and starts syncing.</span></div>`) : ''}`;
     const q = (s) => $(s, el);
     q('#sbSave').onclick = () => { LG.Sync.setProject(q('#sbU').value, q('#sbK').value); toast('Supabase project saved.'); draw(); };
     q('#sbNow') && (q('#sbNow').onclick = () => LG.Sync.run());
     q('#sbOut') && (q('#sbOut').onclick = () => { LG.Sync.signOut(); draw(); });
-    q('#sbSend') && (q('#sbSend').onclick = async () => { try { await LG.Sync.sendCode(q('#sbE').value.trim()); toast('Check your email for the code.'); } catch (e) { toast(e.message); } });
+    q('#sbSend') && (q('#sbSend').onclick = async () => { try { await LG.Sync.sendCode(q('#sbE').value.trim()); toast('Check your email and open the link on this device.'); } catch (e) { toast(e.message); } });
     q('#sbVer') && (q('#sbVer').onclick = async () => { try { await LG.Sync.verify(q('#sbE').value.trim(), q('#sbC').value); toast('Signed in. Syncing…'); draw(); } catch (e) { toast(e.message); } });
   }
 

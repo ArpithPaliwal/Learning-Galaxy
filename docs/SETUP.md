@@ -22,7 +22,7 @@ Any OpenAI-compatible provider (OpenRouter, Gemini, OpenAI, Groq, local) works t
 1. Create a project at https://supabase.com (free plan, any region near you, e.g. Mumbai).
 2. **SQL Editor → New query** → paste all of `supabase/schema.sql` → **Run**.
 3. **Authentication → URL Configuration → Site URL** = `https://learning-galaxy-arpit.netlify.app`.
-4. Optional, for 6-digit codes instead of links: **Authentication → Emails → Magic Link** template, add `{{ .Token }}`.
+4. (Done for you: site URL and redirects are set in `supabase/config.toml`. Free plan emails a sign-in link, not a code.)
 5. **Project Settings → API**: copy the **Project URL** and the **anon public** key.
 6. In the app: ⚡ App → **Cloud sync** → paste both → Save → enter your email → **Email me a code** → sign in.
    (Or ask me to put the URL + anon key into `app/config.js` so every device is pre-filled; both are safe to publish.)

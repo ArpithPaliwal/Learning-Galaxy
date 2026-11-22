@@ -6,3 +6,5 @@ dist/
 # personal data exports never go in the repo
 *backup*.json
 learning-galaxy-export/
+supabase/.temp/
+supabase/.branches/

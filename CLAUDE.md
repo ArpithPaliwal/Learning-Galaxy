@@ -4,6 +4,7 @@ Personal study HUD (Iron Man–style): Today plan, Skill Map, Radar (news/trendi
 Library (topics, paths, research, DSA, tasks), Neural Lab, Training sim, and **Jarvis**, an AI assistant that can
 operate the whole app through actions. Installable PWA, works offline.
 Live: https://learning-galaxy-arpit.netlify.app (Netlify deploys every push to `main`). Setup for humans: `docs/SETUP.md`.
+**Continuing work? Read `docs/HANDOFF.md` first** (current state, IDs, what is not done yet).
 
 ## Commands
 
