@@ -235,10 +235,18 @@
       if (!res.ok) { const t = await res.text(); throw err('sync', /relation .*lg_docs.* does not exist|Could not find the table/i.test(t) ? 'The lg_docs table is missing. Run supabase/schema.sql in your Supabase SQL editor.' : 'Sync failed (' + res.status + '): ' + t.slice(0, 200)); }
       return res;
     }
-    async function run() {
-      if (!configured() || !signedIn()) { set(configured() ? 'signed_out' : 'off'); return; }
-      if (navigator.onLine === false) { set('offline'); return; }
-      if (busy) { again = true; return; } busy = true; set('syncing');
+    // run(): one sync pass at a time; a request made during a pass queues one more pass, and every caller
+    // gets a promise that settles only when all queued passes are done.
+    let inflight = null;
+    function run() {
+      if (!configured() || !signedIn()) { set(configured() ? 'signed_out' : 'off'); return Promise.resolve(); }
+      if (navigator.onLine === false) { set('offline'); return Promise.resolve(); }
+      if (inflight) { again = true; return inflight; }
+      inflight = (async () => { do { again = false; await once(); } while (again); })().finally(() => { inflight = null; });
+      return inflight;
+    }
+    async function once() {
+      busy = true; set('syncing');
       try {
         await store.ready;
         const uid = session().user && session().user.id;
@@ -260,7 +268,7 @@
         }
         state.last = Date.now(); cfg.set('sync.last', state.last); set('ok');
       } catch (e) { console.warn('sync', e); set(e.code === 'signed_out' ? 'signed_out' : 'error', e.message); }
-      finally { busy = false; if (again) { again = false; soon(800); } }
+      finally { busy = false; }
     }
     function soon(ms = 3000) { clearTimeout(timer); timer = setTimeout(run, ms); }
     async function handleRedirect() {

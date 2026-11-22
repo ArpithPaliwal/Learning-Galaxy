@@ -11,8 +11,16 @@
 //   node scripts/db.mjs del <col> <id>             delete a document
 import { readFileSync } from 'node:fs';
 
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY, LG_USER_ID } = process.env;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !LG_USER_ID) { console.error('Set SUPABASE_URL, SUPABASE_SERVICE_KEY and LG_USER_ID.'); process.exit(2); }
+const { SUPABASE_URL, SUPABASE_SERVICE_KEY } = process.env;
+if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) { console.error('Set SUPABASE_URL and SUPABASE_SERVICE_KEY.'); process.exit(2); }
+// LG_USER_ID is optional: in a personal app with one signed-up user we find it automatically.
+let LG_USER_ID = process.env.LG_USER_ID;
+if (!LG_USER_ID) {
+  const res = await fetch(SUPABASE_URL.replace(/\/+$/, '') + '/auth/v1/admin/users?per_page=50', { headers: { apikey: SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + SUPABASE_SERVICE_KEY } });
+  const users = res.ok ? ((await res.json()).users || []) : [];
+  if (users.length !== 1) { console.error(users.length ? 'Several users exist: set LG_USER_ID to choose one.' : 'No user yet: sign in once in the app (App > Cloud sync).'); process.exit(2); }
+  LG_USER_ID = users[0].id;
+}
 const base = SUPABASE_URL.replace(/\/+$/, '') + '/rest/v1/lg_docs';
 const H = { apikey: SUPABASE_SERVICE_KEY, authorization: 'Bearer ' + SUPABASE_SERVICE_KEY, 'content-type': 'application/json' };
 const uid = 'user_id=eq.' + encodeURIComponent(LG_USER_ID);

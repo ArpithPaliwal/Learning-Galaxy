@@ -133,7 +133,10 @@
       /** Apply a remote record if it is newer than ours. Returns true when applied. */
       applyRemote(r) {
         const cur = docs.get(r.path);
-        if (cur && cur.updated >= r.updated) return false;
+        // Same rule as the server: on a tie the incoming write wins. A local change that has not been
+        // pushed yet (dirty) and is at least as new is kept; it will be uploaded on the next pass.
+        if (cur && (cur.dirty ? cur.updated >= r.updated : cur.updated > r.updated)) return false;
+        if (cur && !cur.dirty && cur.updated === r.updated && cur.deleted === !!r.deleted && JSON.stringify(cur.data) === JSON.stringify(r.deleted ? null : r.data)) return false; // our own echo
         const { col, id } = splitPath(r.path);
         const rec = { path: r.path, col, id, data: r.deleted ? null : r.data, updated: Number(r.updated) || 0, deleted: !!r.deleted, dirty: false };
         docs.set(r.path, rec); persist(rec); notify(col); return true;
