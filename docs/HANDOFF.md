@@ -87,3 +87,9 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 | on issue | `feature-request.yml` | Builds requested features, tests, merges → Netlify deploys | done/verified (issue #1 → PR #2) |
 - App side: `LG.loadFeed()` merges the public feed into news/trends on load and every 3h (non-dirty, not uploaded).
 - Radar has "AI tools" and "Videos" filters (`newsTag`: kind tool/video).
+
+## Artifact edition (2026-11-22)
+- New claude.ai artifact **https://claude.ai/artifact/KvHsU3xGV7uhVAPyPmvJDb** (private). Same code as the app; `npm run build:artifact` → `dist-artifact/page.html` (+ `feed/latest.json`), published with the Artifact tool, capabilities `db, sample{images}, downloads, dictation, tts`. The old artifact (33yxqUEtvDXdECHUcWtDf5, v1 HUD + the user's original data) was left untouched (overwriting it needs reading all 2,196 lines).
+- Runtime: `lg-runtime.js` keeps the platform `window.claude` when present (`LG.ARTIFACT`), mirrors the artifact db via `artifactStore()`; Jarvis = viewer's Claude account (no key); Supabase sync is OFF there because claude.ai blocks network calls to other hosts (fetch/XHR/WebSocket). Feature requests become a GitHub "new issue" link.
+- Data bridge between editions = backup file: ⚡ App → Data → Download / Import (both editions). A live artifact⇄Supabase sync is impossible; an on-request bridge by Claude (ArtifactData ↔ Supabase REST) is possible.
+- Republishing: edit app/, `npm run build:artifact`, copy dist-artifact/* into the scratchpad, publish `page.html` to the same file path/URL with `files` for the feed.
