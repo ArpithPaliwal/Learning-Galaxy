@@ -90,8 +90,11 @@ jobs:
         if: github.event_name == 'issues' && always()
         env:
           RESULT: ${{ job.status }}
+          SKIP: ${{ steps.setup.outputs.skip }}
         run: |
-          if [ "$RESULT" = "success" ]; then
+          if [ "$SKIP" = "true" ]; then
+            gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "ℹ️ There is no signed-in user in your cloud database yet, so Claude had nowhere to save the course. Sign in once in the app (⚡ App → Cloud sync), then re-run this from the Actions tab (Cloud job → Run workflow, kind: courses) or wait for the morning run." || true
+          elif [ "$RESULT" = "success" ]; then
             gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "✅ Claude wrote the course and saved it to your app. Open the app (it syncs on open) and look under Courses. [Run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" && gh issue close "$ISSUE" -R "$GITHUB_REPOSITORY" || true
           else
             gh issue comment "$ISSUE" -R "$GITHUB_REPOSITORY" --body "⚠️ Claude could not finish this course. See the [run log]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID); the morning run will try again." || true
