@@ -11,6 +11,13 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const hash = (s) => { let h = 2166136261; for (const ch of String(s)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; };
   const PAL = [[111, 198, 255], [196, 164, 255], [94, 230, 168], [255, 196, 107], [255, 138, 170], [140, 220, 255]];
+  const PALL = [[0, 110, 210], [118, 74, 230], [0, 150, 105], [205, 120, 0], [205, 50, 105], [0, 130, 175]];
+  const isLight = () => document.documentElement.getAttribute('data-theme') === 'light';
+  const pal = (i) => (isLight() ? PALL : PAL)[i % PAL.length];
+  // canvas colour kit for the current theme
+  const kit = () => isLight()
+    ? { light: true, c: (a) => 'rgba(30,105,200,' + Math.min(1, a * 1.5) + ')', b: (a) => 'rgba(20,80,180,' + Math.min(1, a * 1.1) + ')', bg0: '#ffffff', bg1: '#edf3fc', bg2: '#d6e3f6', glow: 'rgba(35,100,220,.5)', hi: '#ffffff', mid: '#2a7fd6', plate: 'rgba(255,255,255,.9)', rim: 'rgba(30,80,170,.9)' }
+    : { light: false, c: (a) => 'rgba(94,200,255,' + a + ')', b: (a) => 'rgba(170,230,255,' + a + ')', bg0: '#0b2a4a', bg1: '#041326', bg2: '#01040c', glow: '#5EC8FF', hi: '#e6f8ff', mid: '#8fdcff', plate: 'rgba(2,12,28,.72)', rim: 'rgba(10,40,90,.9)' };
 
   /* ---------- styles ---------- */
   const css = document.createElement('style');
@@ -31,6 +38,12 @@
   .lgv-lock:hover{border-color:#5EC8FF}
   .lgv-key{position:absolute;left:18px;bottom:14px;z-index:2;display:flex;gap:12px;flex-wrap:wrap;font:600 12px var(--f-body,system-ui);color:#a9b4d6;pointer-events:none}
   .lgv-key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;box-shadow:0 0 8px currentColor;vertical-align:0}
+  html[data-theme="light"] .lgv{background:#edf3fc;border:1px solid #c8d4ee;box-shadow:0 20px 50px -30px rgb(30 80 170 / .35)}
+  html[data-theme="light"] .lgv-hd h3{color:#0d1530} html[data-theme="light"] .lgv-hd p{color:#45517a}
+  html[data-theme="light"] .lgv-tip,html[data-theme="light"] .lgv-lock{background:rgba(255,255,255,.94);border-color:#c8d4ee;color:#45517a;box-shadow:0 10px 30px -14px rgb(13 21 48 / .3)}
+  html[data-theme="light"] .lgv-tip b,html[data-theme="light"] .lgv-lock b{color:#0d1530} html[data-theme="light"] .lgv-lock small{color:#1f6fd6}
+  html[data-theme="light"] .lgv-key{color:#45517a}
+  .lgv-gx .lgv-lock{top:auto;bottom:44px;width:min(230px,calc(100% - 32px))}
   @media (max-width:640px){.lgv{border-radius:20px;margin-inline:-4px}.lgv-lock{top:auto;bottom:44px}.lgv-gx{height:62vh}}`;
   document.head.appendChild(css);
 
@@ -60,18 +73,18 @@
     el.innerHTML = '<canvas aria-label="Skill holo-table: your topics as pins by subject and stage. Drag to turn, tap a pin to open it."></canvas><div class="lgv-hd"><h3>Skill map</h3><p id="gxHint"></p></div><a class="lgv-lock" id="gxLock" hidden></a><div class="lgv-tip"></div><div class="lgv-key" id="gxKey"></div>';
     view.insertBefore(el, view.firstChild);
     const tip = el.querySelector('.lgv-tip'), lock = el.querySelector('#gxLock');
-    let pins = [], cats = [], beam = 0, yaw = -0.5, tilt = 1.02, drag = null, moved = 0, mouse = { x: -1, y: -1 }, hover = null, auto = 1;
+    let dust = null, pins = [], cats = [], beam = 0, yaw = -0.5, tilt = 1.02, drag = null, moved = 0, mouse = { x: -1, y: -1 }, hover = null, auto = 1;
     function rebuild() {
       cats = [...data.categories.values()].sort((a, b) => (a.order ?? 99) - (b.order ?? 99)); if (!cats.length) cats = [{ id: 'all', name: 'Topics' }];
       const ci = new Map(cats.map((c, i) => [c.id, i])); const n = cats.length;
       pins = [...data.topics.values()].filter((t) => !t.hidden).map((t) => {
         const band = BANDS.find((b) => b[0] === t.status) || BANDS[2]; const i = ci.has(t.cat) ? ci.get(t.cat) : 0; const h = hash(t.id), h2 = hash(t.id + '#');
-        return { id: t.id, name: t.title || 'Untitled', st: band[0], stage: band[1], cat: cats[i].name, col: PAL[i % PAL.length],
+        return { id: t.id, name: t.title || 'Untitled', st: band[0], stage: band[1], cat: cats[i].name, get col() { return pal(i); },
           ang: (i + 0.08 + h * 0.84) / n * 6.283, rad: band[2] + (band[3] - band[2]) * (0.12 + h2 * 0.76), ht: band[4] * (0.75 + 0.25 * hash(t.id + '^')), lit: 0 };
       });
       const c = (s) => pins.filter((d) => d.st === s).length;
       el.querySelector('#gxHint').textContent = `${pins.length} topics · ${c('learned')} mastered · ${c('learning')} learning · drag to turn, tap a pin`;
-      el.querySelector('#gxKey').innerHTML = cats.slice(0, 6).map((k, i) => `<span style="color:rgb(${PAL[i % PAL.length].join(',')})"><i style="background:rgb(${PAL[i % PAL.length].join(',')})"></i>${esc(k.name)}</span>`).join('');
+      el.querySelector('#gxKey').innerHTML = cats.slice(0, 6).map((k, i) => `<span style="color:rgb(${pal(i).join(',')})"><i style="background:rgb(${pal(i).join(',')})"></i>${esc(k.name)}</span>`).join('') + '<span>Tall = mastered · ring = learning now · short = bucket · specks = suggestions</span>';
       const cur = pins.find((d) => d.st === 'learning');
       if (cur) { lock.hidden = false; lock.href = '#'; lock.innerHTML = `<small>LEARNING NOW · ${esc(cur.cat)}</small><b>${esc(cur.name)}</b>Tap to open`; lock.onclick = (e) => { e.preventDefault(); window.LGApp && window.LGApp.openTopic(cur.id); }; } else lock.hidden = true;
     }
@@ -82,47 +95,75 @@
     cv.addEventListener('pointerup', () => { const wasDrag = moved > 6; drag = null; el.classList.remove('drag'); setTimeout(() => (auto = 1), 4000); if (!wasDrag && hover && window.LGApp) window.LGApp.openTopic(hover.id); });
     cv.addEventListener('pointerleave', () => { mouse = { x: -1, y: -1 }; });
     function draw(g, W, H, now, dt) {
-      yaw += dt * 0.05 * auto; beam = (beam + dt * 0.8) % 6.283;
-      const cx = W / 2, cy = H * 0.56, R = Math.min(W * 0.36, H * 0.6), HT = R * 0.42;
-      const cY = Math.cos(yaw), sY = Math.sin(yaw), cT = Math.cos(tilt), sT = Math.sin(tilt);
+      const K = kit();
+      yaw += dt * 0.045 * auto; beam = (beam + dt * 0.7) % 6.283;
+      const cT = Math.cos(tilt), sT = Math.sin(tilt);
+      const R = Math.min(W * 0.44, (H - 120) / (2 * Math.max(0.42, cT) + 0.5)), HT = R * 0.5;
+      const cx = W / 2, cy = H * 0.5 + R * 0.18;
+      const cY = Math.cos(yaw), sY = Math.sin(yaw);
       const P = (r, a, z = 0) => { let x = Math.cos(a) * r, y = Math.sin(a) * r; [x, y] = [x * cY - y * sY, x * sY + y * cY]; const yy = y * cT, zz = y * sT; const k = 3.2 / (3.2 + zz / R * 0.9); return [cx + x * k, cy + yy * k - z * k, zz]; };
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-      const bg = g.createRadialGradient(cx, cy - R * 0.3, 0, cx, cy, Math.max(W, H) * 0.8); bg.addColorStop(0, '#0b2a4a'); bg.addColorStop(0.45, '#041326'); bg.addColorStop(1, '#01040c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      // disc glow
-      g.save(); g.translate(cx, cy); g.scale(1, Math.max(0.2, cT)); const dg = g.createRadialGradient(0, 0, 0, 0, 0, R * 1.05); dg.addColorStop(0, 'rgba(94,200,255,.16)'); dg.addColorStop(0.7, 'rgba(94,200,255,.05)'); dg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = dg; g.beginPath(); g.arc(0, 0, R * 1.05, 0, 7); g.fill(); g.restore();
-      const ring = (r, a, w = 1, dash) => { g.strokeStyle = `rgba(94,200,255,${a})`; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); for (let k = 0; k <= 96; k++) { const [x, y] = P(r * R, k / 96 * 6.283); k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]); };
-      for (const [, label, , outer] of BANDS) ring(outer, 0.22);
-      ring(1.0, 0.55, 1.4); ring(1.06, 0.18, 1, [2, 6]);
-      // rim ticks
-      for (let i = 0; i < 120; i++) { const a = i / 120 * 6.283; const [x1, y1] = P(R, a), [x2, y2] = P(R * (i % 10 ? 1.025 : 1.05), a); g.strokeStyle = 'rgba(94,200,255,.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
-      // sectors + labels
-      const n = cats.length; g.font = '600 12px Manrope, system-ui';
-      for (let i = 0; i < n; i++) { const a = i / n * 6.283; const [x0, y0] = P(0, a), [x1, y1] = P(R, a); g.strokeStyle = 'rgba(94,200,255,.12)'; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-        const [lx, ly] = P(R * 1.14, (i + 0.5) / n * 6.283); g.fillStyle = `rgba(${PAL[i % PAL.length].join(',')},.95)`; g.textAlign = 'center'; const tw = g.measureText(cats[i].name).width / 2 + 8; g.fillText(cats[i].name, Math.max(tw, Math.min(W - tw, lx)), ly + 4); g.textAlign = 'left'; }
-      // stage labels along one spoke
-      g.font = '500 9.5px "JetBrains Mono", monospace'; g.fillStyle = 'rgba(143,200,240,.5)'; for (const [, label, , outer] of BANDS) { const [x, y] = P(outer * R - 4, -Math.PI / 2 - yaw); g.fillText(label.toUpperCase(), x + 4, y); }
-      // sweep wedge on the disc
-      g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } for (let k = 0; k <= 24; k++) { const [x, y] = P(R, beam - 0.55 + k / 24 * 0.55); g.lineTo(x, y); } g.closePath();
-      const [bx, by] = P(R, beam); const sg = g.createLinearGradient(cx, cy, bx, by); sg.addColorStop(0, 'rgba(94,200,255,.05)'); sg.addColorStop(1, 'rgba(140,225,255,.22)'); g.fillStyle = sg; g.fill();
-      g.strokeStyle = 'rgba(190,240,255,.85)'; g.lineWidth = 1.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 10; g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } g.lineTo(bx, by); g.stroke(); g.shadowBlur = 0;
-      // centre pylon
-      { const [x, y] = P(0, 0); const pg = g.createLinearGradient(x, y, x, y - HT * 0.6); pg.addColorStop(0, 'rgba(143,225,255,.7)'); pg.addColorStop(1, 'rgba(143,225,255,0)'); g.strokeStyle = pg; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - HT * 0.6); g.stroke(); g.fillStyle = '#e6f8ff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 14; g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); g.shadowBlur = 0; }
+      const bg = g.createRadialGradient(cx, cy - R * 0.4, 0, cx, cy, Math.max(W, H) * 0.85); bg.addColorStop(0, K.bg0); bg.addColorStop(0.4, K.bg1); bg.addColorStop(1, K.bg2); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      // soft disc glow
+      g.save(); g.translate(cx, cy); g.scale(1, Math.max(0.2, cT)); const dg = g.createRadialGradient(0, 0, 0, 0, 0, R * 1.1); dg.addColorStop(0, K.c(.20)); dg.addColorStop(0.6, K.c(.06)); dg.addColorStop(1, K.c(0)); g.fillStyle = dg; g.beginPath(); g.arc(0, 0, R * 1.1, 0, 7); g.fill(); g.restore();
+      // subject wedges: a faint tint per subject
+      const n = cats.length;
+      for (let i = 0; i < n; i++) {
+        const a0 = i / n * 6.283, a1 = (i + 1) / n * 6.283; g.beginPath(); { const [x, y] = P(0.1 * R, a0); g.moveTo(x, y); }
+        for (let k = 0; k <= 24; k++) { const [x, y] = P(R, a0 + (a1 - a0) * k / 24); g.lineTo(x, y); }
+        for (let k = 24; k >= 0; k--) { const [x, y] = P(0.1 * R, a0 + (a1 - a0) * k / 24); g.lineTo(x, y); }
+        g.closePath(); g.fillStyle = `rgba(${pal(i).join(',')},.045)`; g.fill();
+        const [x0, y0] = P(0.1 * R, a0), [x1, y1] = P(R, a0); g.strokeStyle = K.c(.16); g.lineWidth = 1; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+      }
+      // stage rings (thin), rim (bright), outer dashed ring, rim ticks
+      const ring = (r, a, w = 1, dash) => { g.strokeStyle = `${K.c(a)}`; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); for (let k = 0; k <= 120; k++) { const [x, y] = P(r * R, k / 120 * 6.283); k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]); };
+      ring(0.1, 0.35); for (const b of BANDS) ring(b[3], 0.14, 1, [3, 5]);
+      ring(1.0, 0.6, 1.5); ring(1.07, 0.16, 1, [2, 7]);
+      for (let i = 0; i < 144; i++) { const a = i / 144 * 6.283; const [x1, y1] = P(R, a), [x2, y2] = P(R * (i % 12 ? 1.02 : 1.045), a); g.strokeStyle = `${K.c(i % 12 ? 0.3 : 0.6)}`; g.lineWidth = 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+      // subject names on the rim
+      g.font = '700 12.5px Manrope, system-ui';
+      for (let i = 0; i < n; i++) { const [lx, ly] = P(R * 1.15, (i + 0.5) / n * 6.283); const name = cats[i].name; const tw = g.measureText(name).width / 2 + 10;
+        g.fillStyle = `rgba(${pal(i).join(',')},.95)`; g.textAlign = 'center'; g.fillText(name, Math.max(tw, Math.min(W - tw, lx)), Math.min(H - 40, ly + 4)); g.textAlign = 'left'; }
+      // sweep wedge
+      g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } for (let k = 0; k <= 28; k++) { const [x, y] = P(R, beam - 0.6 + k / 28 * 0.6); g.lineTo(x, y); } g.closePath();
+      const [bx, by] = P(R, beam); const sg = g.createLinearGradient(cx, cy, bx, by); sg.addColorStop(0, K.c(.03)); sg.addColorStop(1, K.b(.2)); g.fillStyle = sg; g.fill();
+      g.strokeStyle = K.b(.8); g.lineWidth = 1.4; g.shadowColor = K.glow; g.shadowBlur = 10; g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } g.lineTo(bx, by); g.stroke(); g.shadowBlur = 0;
+      // holographic dust rising off the disc
+      if (!dust) { let s = 3; const r2 = () => (s = (s * 16807) % 2147483647) / 2147483647; dust = Array.from({ length: 90 }, () => ({ r: Math.sqrt(r2()) * 0.95, a: r2() * 6.283, z: r2(), v: 0.03 + r2() * 0.06 })); }
+      for (const d of dust) { d.z += d.v * dt; if (d.z > 1) d.z = 0; const [x, y] = P(d.r * R, d.a, d.z * HT * 1.2); g.globalAlpha = 0.5 * Math.sin(Math.PI * d.z); g.fillStyle = K.mid; g.fillRect(x, y, 1.4, 1.4); }
+      g.globalAlpha = 1;
+      // core emitter
+      { const [x, y] = P(0, 0); const pg = g.createLinearGradient(x, y, x, y - HT * 0.7); pg.addColorStop(0, K.b(.8)); pg.addColorStop(1, K.b(0)); g.strokeStyle = pg; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - HT * 0.7); g.stroke();
+        g.fillStyle = K.hi; g.shadowColor = K.glow; g.shadowBlur = 18; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); g.shadowBlur = 0;
+        const k = (now / 1800) % 1; g.strokeStyle = `${K.b(0.6 * (1 - k))}`; g.beginPath(); g.ellipse(x, y, 6 + k * R * 0.12, (6 + k * R * 0.12) * Math.max(0.25, cT), 0, 0, 7); g.stroke(); }
       // pins, back to front
       const list = pins.map((p) => { const [bx2, by2, z] = P(p.rad * R, p.ang); return { p, bx: bx2, by: by2, z }; }).sort((a, b) => b.z - a.z);
-      hover = null; let best = 14;
+      hover = null; let best = 14; const labels = [];
       for (const { p, bx: x, by: y } of list) {
         let diff = (beam - p.ang) % 6.283; if (diff < 0) diff += 6.283; if (diff < 0.06) p.lit = 1; p.lit = Math.max(0, p.lit - dt * 0.4);
-        const h = p.ht * HT * (p.st === 'learning' ? 1 + 0.06 * Math.sin(now / 400 + p.rad * 10) : 1); const top = y - h * Math.max(0.35, sT);
-        const rgb = p.col.join(','); const a = p.st === 'suggested' ? 0.35 : p.st === 'todo' ? 0.7 : 1;
-        // shadow dot on the disc + stem
-        g.globalAlpha = 0.5 * a; g.fillStyle = `rgba(${rgb},.6)`; g.beginPath(); g.ellipse(x, y, 3, 3 * Math.max(0.25, cT), 0, 0, 7); g.fill();
-        if (h > 2) { const sg2 = g.createLinearGradient(x, y, x, top); sg2.addColorStop(0, `rgba(${rgb},.08)`); sg2.addColorStop(1, `rgba(${rgb},${0.75 * a})`); g.globalAlpha = 1; g.strokeStyle = sg2; g.lineWidth = 1.3; g.beginPath(); g.moveTo(x, y); g.lineTo(x, top); g.stroke(); }
+        const rgb = p.col.join(',');
+        if (p.st === 'suggested') { // dim specks on the disc, no stem
+          g.globalAlpha = 0.28 + p.lit * 0.5; g.fillStyle = `rgb(${rgb})`; g.fillRect(x - 1, y - 1, 2, 2);
+          const dd = Math.hypot(mouse.x - x, mouse.y - y); if (dd < best) { best = dd; hover = { p, x, y }; } continue;
+        }
+        const h = p.ht * HT * (p.st === 'learning' ? 1 + 0.05 * Math.sin(now / 420 + p.rad * 10) : 1); const top = y - h * Math.max(0.4, sT);
+        const a = p.st === 'todo' ? 0.75 : 1;
+        // base ring on the disc
+        g.globalAlpha = 0.55 * a; g.strokeStyle = `rgba(${rgb},.7)`; g.lineWidth = 1; g.beginPath(); g.ellipse(x, y, 3.5, 3.5 * Math.max(0.25, cT), 0, 0, 7); g.stroke();
+        // stem
+        const sg2 = g.createLinearGradient(x, y, x, top); sg2.addColorStop(0, `rgba(${rgb},.05)`); sg2.addColorStop(1, `rgba(${rgb},${0.8 * a})`); g.globalAlpha = 1; g.strokeStyle = sg2; g.lineWidth = p.st === 'todo' ? 1 : 1.6; g.beginPath(); g.moveTo(x, y); g.lineTo(x, top); g.stroke();
+        const size = (p.st === 'learned' ? 4.6 : p.st === 'learning' ? 4.8 : 2.8) + 1.5 * p.lit;
+        g.globalAlpha = Math.min(1, a + p.lit * 0.5); g.fillStyle = `rgb(${rgb})`; g.shadowColor = `rgb(${rgb})`; g.shadowBlur = (p.st === 'todo' ? 5 : 14) + 12 * p.lit; g.beginPath(); g.arc(x, top, size, 0, 7); g.fill(); g.shadowBlur = 0;
+        if (p.st !== 'todo') { g.fillStyle = K.hi; g.globalAlpha = 0.9; g.beginPath(); g.arc(x, top, size * 0.4, 0, 7); g.fill(); labels.push({ p, x, y: top }); }
+        if (p.st === 'learning') { const k = (now / 1500 + p.rad) % 1; g.globalAlpha = 0.7 * (1 - k); g.strokeStyle = `rgb(${rgb})`; g.lineWidth = 1.1; g.beginPath(); g.arc(x, top, 7 + k * 15, 0, 7); g.stroke(); }
         const dd = Math.hypot(mouse.x - x, mouse.y - top); if (dd < best) { best = dd; hover = { p, x, y: top }; }
-        const size = (p.st === 'learned' ? 4.2 : p.st === 'learning' ? 4.4 : p.st === 'todo' ? 3 : 2.2) + 1.6 * p.lit;
-        g.globalAlpha = Math.min(1, a + p.lit * 0.5); g.fillStyle = `rgb(${rgb})`; g.shadowColor = `rgb(${rgb})`; g.shadowBlur = (p.st === 'learned' ? 12 : 6) + 14 * p.lit; g.beginPath(); g.arc(x, top, size, 0, 7); g.fill(); g.shadowBlur = 0;
-        if (p.st === 'learning') { const k = (now / 1500 + p.rad) % 1; g.globalAlpha = 0.7 * (1 - k); g.strokeStyle = `rgb(${rgb})`; g.lineWidth = 1.1; g.beginPath(); g.arc(x, top, 6 + k * 14, 0, 7); g.stroke(); }
       }
-      g.globalAlpha = 1;
+      // floating names for mastered + learning pins
+      g.globalAlpha = 1; g.font = '600 11.5px Manrope, system-ui';
+      const placed = []; for (const l of labels.slice(0, 14)) { const txt = l.p.name.length > 26 ? l.p.name.slice(0, 25) + '…' : l.p.name; const w = g.measureText(txt).width;
+        const lx = Math.max(6, Math.min(W - w - 14, l.x + 9)), ly = l.y - 9; if (placed.some((q) => lx < q[0] + q[2] + 6 && lx + w + 6 > q[0] && Math.abs(ly - q[1]) < 18)) continue; placed.push([lx, ly, w]);
+        g.fillStyle = K.plate; g.beginPath(); g.roundRect ? g.roundRect(lx - 5, ly - 12, w + 10, 17, 8) : g.rect(lx - 5, ly - 12, w + 10, 17); g.fill();
+        g.fillStyle = `rgb(${l.p.col.join(',')})`; g.fillText(txt, lx, ly); }
       if (hover) {
         g.strokeStyle = `rgb(${hover.p.col.join(',')})`; g.lineWidth = 1.4; g.beginPath(); g.arc(hover.x, hover.y, 10, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
         tip.style.display = 'block'; tip.style.left = Math.min(hover.x, W - 265) + 'px'; tip.style.top = hover.y + 'px';
@@ -146,6 +187,7 @@
     const gyros = [{ r: 0.62, ax: 1.15, sp: 0.55, seg: [0.9, 0.25, 1.6, 0.4, 0.6, 0.3] }, { r: 0.74, ax: -0.7, sp: -0.38, seg: [2.2, 0.3, 0.5, 0.35] }, { r: 0.86, ax: 0.35, sp: 0.24, seg: [0.25, 0.12] }];
     const TEXT = 'J.A.R.V.I.S · LEARNING GALAXY · ONLINE · ';
     canvasLoop(el, (g, W, H, now, dt) => {
+      const K = kit();
       t += dt; const orb = document.getElementById('orb'); const sub = (document.getElementById('jSub') || {}).textContent || '';
       mode = /Speaking/i.test(sub) ? 'speaking' : /Listening/i.test(sub) ? 'listening' : (orb && orb.classList.contains('busy')) || /Thinking/i.test(sub) ? 'thinking' : 'idle';
       st.textContent = { idle: 'Online', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' }[mode];
@@ -154,16 +196,16 @@
       const cx = W / 2, cy = H / 2 - 12, R = Math.min(W * 0.38, H * 0.38); const sp = 0.6 + energy * 2;
       g.clearRect(0, 0, W, H); g.globalAlpha = 1;
       // halo
-      const hg = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); hg.addColorStop(0, `rgba(94,200,255,${0.1 + energy * 0.1})`); hg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = hg; g.fillRect(0, 0, W, H);
+      const hg = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); hg.addColorStop(0, `${K.c(0.1 + energy * 0.1)}`); hg.addColorStop(1, K.c(0)); g.fillStyle = hg; g.fillRect(0, 0, W, H);
       // rotating text ring (flat)
-      g.save(); g.translate(cx, cy); g.rotate(-t * 0.08 * sp); g.font = '500 8.5px "JetBrains Mono", monospace'; g.fillStyle = 'rgba(143,210,245,.5)';
+      g.save(); g.translate(cx, cy); g.rotate(-t * 0.08 * sp); g.font = '500 8.5px "JetBrains Mono", monospace'; g.fillStyle = K.b(.5);
       const chars = (TEXT + TEXT).split(''); const step = 6.283 / chars.length; chars.forEach((ch, i) => { g.save(); g.rotate(i * step); g.translate(0, -R * 1.02); g.fillText(ch, -2.5, 0); g.restore(); }); g.restore();
       // outer tick ring
-      g.save(); g.translate(cx, cy); g.rotate(t * 0.05 * sp); for (let i = 0; i < 90; i++) { const a = i / 90 * 6.283, L = i % 15 ? 3 : 7; g.strokeStyle = `rgba(94,200,255,${i % 15 ? 0.35 : 0.7})`; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.cos(a) * R * 0.94, Math.sin(a) * R * 0.94); g.lineTo(Math.cos(a) * (R * 0.94 - L), Math.sin(a) * (R * 0.94 - L)); g.stroke(); } g.restore();
+      g.save(); g.translate(cx, cy); g.rotate(t * 0.05 * sp); for (let i = 0; i < 90; i++) { const a = i / 90 * 6.283, L = i % 15 ? 3 : 7; g.strokeStyle = `${K.c(i % 15 ? 0.35 : 0.7)}`; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.cos(a) * R * 0.94, Math.sin(a) * R * 0.94); g.lineTo(Math.cos(a) * (R * 0.94 - L), Math.sin(a) * (R * 0.94 - L)); g.stroke(); } g.restore();
       // circular equaliser
       for (let i = 0; i < 64; i++) { const target = voice * (0.35 + 0.65 * Math.abs(Math.sin(i * 0.7 + t * 6) * Math.sin(i * 0.23 - t * 3.1))); lvl[i] += (target - lvl[i]) * Math.min(1, dt * 12); }
       g.save(); g.translate(cx, cy); g.lineCap = 'round';
-      for (let i = 0; i < 64; i++) { const a = i / 64 * 6.283 - Math.PI / 2; const r0 = R * 0.3, r1 = r0 + R * (0.02 + lvl[i] * 0.22); g.strokeStyle = `rgba(${140 + lvl[i] * 100},${220 + lvl[i] * 30},255,${0.35 + lvl[i] * 0.6})`; g.lineWidth = 2; g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke(); }
+      for (let i = 0; i < 64; i++) { const a = i / 64 * 6.283 - Math.PI / 2; const r0 = R * 0.3, r1 = r0 + R * (0.02 + lvl[i] * 0.22); g.strokeStyle = K.light ? `rgba(${30 + lvl[i] * 20},${100 + lvl[i] * 40},${200 + lvl[i] * 40},${0.45 + lvl[i] * 0.5})` : `rgba(${140 + lvl[i] * 100},${220 + lvl[i] * 30},255,${0.35 + lvl[i] * 0.6})`; g.lineWidth = 2; g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke(); }
       g.restore();
       // gyroscope rings: circles on tilted planes, back half dim, front half bright, segmented
       const drawGyro = (gy, front) => {
@@ -174,30 +216,31 @@
           if (!on) continue;
           const pt = (a) => { let x = Math.cos(a) * gy.r * R, y = Math.sin(a) * gy.r * R, z = 0; [y, z] = [y * cA, y * sA]; [x, z] = [x * cR - z * sR, x * sR + z * cR]; return [cx + x, cy + y, z]; };
           const [x0, y0, z0] = pt(a0), [x1, y1] = pt(a1); const isFront = z0 < 0; if (isFront !== front) continue;
-          g.strokeStyle = front ? `rgba(170,232,255,${0.55 + energy * 0.35})` : 'rgba(94,200,255,.18)'; g.lineWidth = front ? 2 : 1.2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+          g.strokeStyle = front ? `${K.b(0.55 + energy * 0.35)}` : K.c(.18); g.lineWidth = front ? 2 : 1.2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
         }
       };
       gyros.forEach((gy) => drawGyro(gy, false));
       // core sphere
       const pulse = 1 + voice * 0.12 + Math.sin(t * 1.6) * 0.02; const cr = R * 0.2 * pulse;
-      const sg = g.createRadialGradient(cx - cr * 0.3, cy - cr * 0.35, cr * 0.1, cx, cy, cr); sg.addColorStop(0, '#eafaff'); sg.addColorStop(0.35, '#7fd4ff'); sg.addColorStop(0.8, '#1f6fc0'); sg.addColorStop(1, 'rgba(10,40,90,.9)');
-      g.shadowColor = '#5EC8FF'; g.shadowBlur = 24 + voice * 30; g.fillStyle = sg; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.fill(); g.shadowBlur = 0;
-      g.strokeStyle = 'rgba(200,245,255,.6)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.stroke();
+      const sg = g.createRadialGradient(cx - cr * 0.3, cy - cr * 0.35, cr * 0.1, cx, cy, cr); sg.addColorStop(0, K.hi); sg.addColorStop(0.35, K.mid); sg.addColorStop(0.8, '#1f6fc0'); sg.addColorStop(1, K.rim);
+      g.shadowColor = K.glow; g.shadowBlur = 24 + voice * 30; g.fillStyle = sg; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.fill(); g.shadowBlur = 0;
+      g.strokeStyle = K.b(.6); g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.stroke();
       // latitude lines on the sphere
-      g.save(); g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.clip(); g.strokeStyle = 'rgba(230,250,255,.25)'; for (let k = -2; k <= 2; k++) { g.beginPath(); g.ellipse(cx, cy + k * cr * 0.33, cr * Math.sqrt(1 - (k * 0.33) ** 2), cr * 0.12, 0, 0, 7); g.stroke(); }
+      g.save(); g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.clip(); g.strokeStyle = K.b(.25); for (let k = -2; k <= 2; k++) { g.beginPath(); g.ellipse(cx, cy + k * cr * 0.33, cr * Math.sqrt(1 - (k * 0.33) ** 2), cr * 0.12, 0, 0, 7); g.stroke(); }
       const lon = (t * 0.8 * sp) % 6.283; for (let k = 0; k < 3; k++) { const w = Math.cos(lon + k * 1.05) * cr; g.beginPath(); g.ellipse(cx, cy, Math.abs(w), cr, 0, 0, 7); g.stroke(); } g.restore();
       gyros.forEach((gy) => drawGyro(gy, true));
       // sparks
-      for (const s of sparks) { s.a += dt * s.sp * sp * 0.6; const x = Math.cos(s.a) * s.r * R, y = Math.sin(s.a) * s.r * R * Math.cos(s.tilt); const z = Math.sin(s.a) * Math.sin(s.tilt); g.globalAlpha = (0.25 + 0.5 * (1 - (z + 1) / 2)) * (0.6 + energy * 0.5); g.fillStyle = s.s < 0.15 ? '#e6f8ff' : '#7fd4ff'; const sz = s.s < 0.15 ? 2 : 1.2; g.fillRect(cx + x, cy + y, sz, sz); }
+      for (const s of sparks) { s.a += dt * s.sp * sp * 0.6; const x = Math.cos(s.a) * s.r * R, y = Math.sin(s.a) * s.r * R * Math.cos(s.tilt); const z = Math.sin(s.a) * Math.sin(s.tilt); g.globalAlpha = (0.25 + 0.5 * (1 - (z + 1) / 2)) * (0.6 + energy * 0.5); g.fillStyle = s.s < 0.15 ? K.hi : K.mid; const sz = s.s < 0.15 ? 2 : 1.2; g.fillRect(cx + x, cy + y, sz, sz); }
       g.globalAlpha = 1;
       // thinking: a bright arc racing around
-      if (mode === 'thinking') { const a = t * 5; g.strokeStyle = 'rgba(220,250,255,.95)'; g.lineWidth = 2.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 14; g.beginPath(); g.arc(cx, cy, R * 0.94, a, a + 0.7); g.stroke(); g.beginPath(); g.arc(cx, cy, R * 0.94, a + Math.PI, a + Math.PI + 0.7); g.stroke(); g.shadowBlur = 0; }
+      if (mode === 'thinking') { const a = t * 5; g.strokeStyle = K.b(.95); g.lineWidth = 2.5; g.shadowColor = K.glow; g.shadowBlur = 14; g.beginPath(); g.arc(cx, cy, R * 0.94, a, a + 0.7); g.stroke(); g.beginPath(); g.arc(cx, cy, R * 0.94, a + Math.PI, a + Math.PI + 0.7); g.stroke(); g.shadowBlur = 0; }
     });
   }
 
   /* =====================================================================
    * RADAR
    * ===================================================================== */
+  const KINDSL = [[0, 120, 205], [0, 150, 105], [200, 120, 0], [118, 74, 230], [205, 50, 105]];
   const KINDS = [['launch', 'Launches', [94, 200, 255]], ['repo', 'Repos', [61, 220, 151]], ['paper', 'Papers', [255, 181, 71]], ['article', 'Articles', [182, 156, 255]], ['practice', 'Practice', [255, 138, 170]]];
   function mountRadar() {
     const view = document.getElementById('v-radar'); if (!view || view.querySelector('.lgv-rd')) return;
@@ -216,7 +259,7 @@
       blips = items.map((n) => {
         const k = KINDS.findIndex(([id]) => id === n.kind); const ki = k < 0 ? 3 : k; const age = (newest - day(n.date || n.added).getTime()) / 864e5;
         const sector = (ki / KINDS.length) * 6.283; const ang = sector + (0.12 + hash(n.id || n.title) * 0.76) * (6.283 / KINDS.length);
-        return { n, col: KINDS[ki][2], kind: KINDS[ki][1], ang, rad: 0.12 + 0.82 * Math.min(1, age / span), lit: 0 };
+        return { n, get col() { return isLight() ? KINDSL[ki] : KINDS[ki][2]; }, kind: KINDS[ki][1], ang, rad: 0.12 + 0.82 * Math.min(1, age / span), lit: 0 };
       });
       const learning = [...data.topics.values()].filter((t) => t.status === 'learning' || t.status === 'todo').map((t) => String(t.title || '').toLowerCase());
       const pick = items.find((n) => n.topic && learning.some((l) => l && (l.includes(String(n.topic).toLowerCase().slice(0, 14)) || String(n.topic).toLowerCase().includes(l.slice(0, 14))))) || items.find((n) => n.kind === 'launch') || items[0];
@@ -230,31 +273,32 @@
     cv.addEventListener('pointerleave', () => { mouse = { x: -1, y: -1 }; });
     cv.addEventListener('click', () => { if (hover && /^https?:/.test(hover.n.url || '')) window.open(hover.n.url, '_blank', 'noopener'); });
     function draw(g, W, H, now, dt) {
+      const K = kit();
       const cx = W / 2, cy = H / 2 + 16, R = Math.min(W, H) * 0.42; beam = (beam + dt * 1.25) % 6.283;
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-      const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); bg.addColorStop(0, '#0b2a4a'); bg.addColorStop(0.45, '#041326'); bg.addColorStop(1, '#01040c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); bg.addColorStop(0, K.bg0); bg.addColorStop(0.45, K.bg1); bg.addColorStop(1, K.bg2); g.fillStyle = bg; g.fillRect(0, 0, W, H);
       // rings, cross, ticks
-      g.strokeStyle = 'rgba(94,200,255,.22)'; g.lineWidth = 1; for (let i = 1; i <= 4; i++) { g.beginPath(); g.arc(cx, cy, R * i / 4, 0, 7); g.stroke(); }
-      g.strokeStyle = 'rgba(94,200,255,.5)'; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
-      g.strokeStyle = 'rgba(94,200,255,.14)'; g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
-      for (let i = 0; i < 72; i++) { const a = i / 72 * 6.283, L = i % 6 ? 4 : 9; g.strokeStyle = 'rgba(94,200,255,.45)'; g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + L), cy + Math.sin(a) * (R + L)); g.stroke(); }
+      g.strokeStyle = K.c(.22); g.lineWidth = 1; for (let i = 1; i <= 4; i++) { g.beginPath(); g.arc(cx, cy, R * i / 4, 0, 7); g.stroke(); }
+      g.strokeStyle = K.c(.5); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+      g.strokeStyle = K.c(.14); g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
+      for (let i = 0; i < 72; i++) { const a = i / 72 * 6.283, L = i % 6 ? 4 : 9; g.strokeStyle = K.c(.45); g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + L), cy + Math.sin(a) * (R + L)); g.stroke(); }
       // sector dividers
-      g.strokeStyle = 'rgba(94,200,255,.08)'; for (let k = 0; k < KINDS.length; k++) { const a = k / KINDS.length * 6.283 - Math.PI / 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke(); }
+      g.strokeStyle = K.c(.08); for (let k = 0; k < KINDS.length; k++) { const a = k / KINDS.length * 6.283 - Math.PI / 2; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke(); }
       // sweep (trail behind the beam)
       g.save(); g.translate(cx, cy); g.rotate(beam - Math.PI / 2);
       const sw = g.createConicGradient ? g.createConicGradient(0, 0, 0) : null;
-      if (sw) { sw.addColorStop(0, 'rgba(94,200,255,0)'); sw.addColorStop(0.75, 'rgba(94,200,255,0)'); sw.addColorStop(0.95, 'rgba(94,200,255,.18)'); sw.addColorStop(1, 'rgba(140,225,255,.55)'); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); }
-      g.strokeStyle = 'rgba(190,240,255,.9)'; g.lineWidth = 2; g.shadowColor = '#5EC8FF'; g.shadowBlur = 12; g.beginPath(); g.moveTo(0, 0); g.lineTo(R, 0); g.stroke(); g.restore();
+      if (sw) { sw.addColorStop(0, K.c(0)); sw.addColorStop(0.75, K.c(0)); sw.addColorStop(0.95, K.c(.18)); sw.addColorStop(1, K.b(.55)); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); }
+      g.strokeStyle = K.b(.9); g.lineWidth = 2; g.shadowColor = K.glow; g.shadowBlur = 12; g.beginPath(); g.moveTo(0, 0); g.lineTo(R, 0); g.stroke(); g.restore();
       // blips: light up when the beam passes, then fade
       hover = null; let best = 14;
       for (const b of blips) {
         const a = b.ang - Math.PI / 2; const x = cx + Math.cos(a) * b.rad * R, y = cy + Math.sin(a) * b.rad * R; b.x = x; b.y = y;
         let diff = (beam - b.ang) % 6.283; if (diff < 0) diff += 6.283; if (diff < 0.08) b.lit = 1; b.lit = Math.max(0, b.lit - dt * 0.28);
         const d = Math.hypot(mouse.x - x, mouse.y - y); if (d < best) { best = d; hover = b; }
-        const a2 = 0.3 + 0.7 * b.lit; g.globalAlpha = a2; g.fillStyle = `rgb(${b.col.join(',')})`; g.shadowColor = `rgb(${b.col.join(',')})`; g.shadowBlur = 6 + 18 * b.lit;
+        const a2 = (K.light ? 0.62 : 0.3) + (K.light ? 0.38 : 0.7) * b.lit; g.globalAlpha = a2; g.fillStyle = `rgb(${b.col.join(',')})`; g.shadowColor = `rgb(${b.col.join(',')})`; g.shadowBlur = 6 + 18 * b.lit;
         g.beginPath(); g.arc(x, y, 3.2 + 2.2 * b.lit, 0, 7); g.fill(); g.shadowBlur = 0;
       }
-      g.globalAlpha = 1; g.fillStyle = '#fff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 18; g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.fill(); g.shadowBlur = 0;
+      g.globalAlpha = 1; g.fillStyle = K.hi; g.shadowColor = K.glow; g.shadowBlur = 18; g.beginPath(); g.arc(cx, cy, 4, 0, 7); g.fill(); g.shadowBlur = 0;
       if (hover) {
         g.strokeStyle = `rgb(${hover.col.join(',')})`; g.lineWidth = 1.4; g.beginPath(); g.arc(hover.x, hover.y, 10, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
         tip.style.display = 'block'; tip.style.left = Math.min(hover.x, W - 265) + 'px'; tip.style.top = hover.y + 'px';
