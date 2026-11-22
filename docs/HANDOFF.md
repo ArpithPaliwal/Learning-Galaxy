@@ -49,3 +49,9 @@ User picked mockup C2 (black + faint stars, deep-blue hero), loves blue, wants a
 - Layout: ≥1101px left sidebar; tablet top bar; phone bottom tabs. On phone `.top` must not have backdrop-filter (it traps the fixed tab bar).
 - Reviewed with headless-Edge screenshots, both themes, 1440/820/500px, real data (seed via a temporary dist/seed.js, then deleted).
 - Not done: Today·Learn·Jarvis·Radar·Library tab restructure (proposed only); inner screens (Skill Map, Radar, Courses, Library, Labs) re-skinned but not individually reviewed in the light theme. Mockups: `.superpowers/brainstorm/` (gitignored).
+
+## Signature visuals (done and deployed 2026-11-22)
+- `app/lg-visuals.js`: Galaxy (top of Skill Map tab) and Radar (top of Radar tab), canvas, fed live from LG.store; animate only while visible; fewer particles on small screens.
+- Galaxy: arms = categories; mastered near core, learning mid-arm (one pulsing ring on the current topic), todo outer, suggested faint at rim. Tap a star → `window.LGApp.openTopic(id)` (exposed in index.html before boot).
+- Radar: sector = news kind (launch/repo/paper/article/practice), distance = age relative to newest item, blips flash as the beam passes, target lock = newest item whose `topic` matches a learning/todo topic.
+- User rejected: generic restyles (calm dark, light-friendly, bento, aurora, electric), the bright/dense Jarvis orb, an original mask, and using a movie helmet image (deleted). Liked: realistic decluttered galaxy, radar v2. Jarvis look is still open.
