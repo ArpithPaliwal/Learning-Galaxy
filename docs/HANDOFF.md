@@ -55,3 +55,12 @@ User picked mockup C2 (black + faint stars, deep-blue hero), loves blue, wants a
 - Galaxy: arms = categories; mastered near core, learning mid-arm (one pulsing ring on the current topic), todo outer, suggested faint at rim. Tap a star → `window.LGApp.openTopic(id)` (exposed in index.html before boot).
 - Radar: sector = news kind (launch/repo/paper/article/practice), distance = age relative to newest item, blips flash as the beam passes, target lock = newest item whose `topic` matches a learning/todo topic.
 - User rejected: generic restyles (calm dark, light-friendly, bento, aurora, electric), the bright/dense Jarvis orb, an original mask, and using a movie helmet image (deleted). Liked: realistic decluttered galaxy, radar v2. Jarvis look is still open.
+
+## Radar theme (v4, deployed 2026-11-22)
+User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jarvis cool".
+- `app/theme-radar.css` (after theme.css; dark theme only): navy radial bg (#0b2a4a→#041326→#01040c), cyan #5EC8FF hairlines, faint rings + slow sweep behind the app, mono uppercase readout labels (JetBrains Mono), sonar "Up next" card, mini-sonar `.rx` orbs.
+- Dark tokens in theme.css switched to the radar palette.
+- Skill Map galaxy replaced by a radar-style **skill chart** (lg-visuals.js `mountGalaxy`): sectors = categories, rings = Mastered/Learning/Bucket/Suggested.
+- Jarvis: `.j-core` sonar canvas above the chat; reads state from `#jSub` text and `#orb.busy`.
+- Theme init always sets `data-theme` (system mode resolves via matchMedia and follows changes).
+- Not reviewed yet: light theme with the new screens, phone layout of the skill chart / Jarvis core.
