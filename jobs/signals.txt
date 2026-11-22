@@ -1,0 +1,8 @@
+# Topics the daily feed asks last30days about (Reddit, Hacker News, GitHub, Polymarket; last 30 days).
+# One per line; lines starting with # are ignored. Keep it to ~6 topics: each takes up to a few minutes.
+LLM agents and tool calling
+new AI model releases
+retrieval augmented generation RAG
+training small LLMs from scratch
+AI coding agents Claude Code skills
+inference optimization and serving
