@@ -1,0 +1,77 @@
+# The overnight "daily job" (and the course-video finder) for Learning Galaxy.
+# Claude Code runs headless with web search and edits the learner's cloud data through scripts/db.mjs.
+#
+# Secrets (Settings > Secrets and variables > Actions):
+#   CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) or ANTHROPIC_API_KEY
+#   SUPABASE_URL, SUPABASE_SERVICE_KEY (service_role key), LG_USER_ID (your user id from Supabase > Authentication)
+#
+# Triggers: every morning 06:30 IST, the app (⚡ App > Builder > Run … now, or Jarvis), or Actions > Run workflow.
+name: Cloud job
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: daily (everything) or courses (only find course videos)
+        required: false
+        default: daily
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-job
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      LG_USER_ID: ${{ secrets.LG_USER_ID }}
+      KIND: ${{ inputs.kind || 'daily' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check setup
+        env:
+          HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          missing=""
+          [ "$HAS_CLAUDE" = "true" ] || missing="$missing CLAUDE_CODE_OAUTH_TOKEN"
+          [ -n "$SUPABASE_URL" ] || missing="$missing SUPABASE_URL"
+          [ -n "$SUPABASE_SERVICE_KEY" ] || missing="$missing SUPABASE_SERVICE_KEY"
+          [ -n "$LG_USER_ID" ] || missing="$missing LG_USER_ID"
+          if [ -n "$missing" ]; then echo "::error::Missing repo secrets:$missing (see docs/SETUP.md)"; exit 1; fi
+          node scripts/db.mjs cols
+
+      - name: Claude runs the job
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -uo pipefail
+          export TODAY="$(TZ=Asia/Kolkata date +%F)"
+          if [ "$KIND" = "courses" ]; then
+            PROMPT="$(cat jobs/daily.md)
+
+          ## This run
+          Only do step 1 (courses waiting for videos), then step 5 with a one-line digest about the courses. Today is $TODAY."
+          else
+            PROMPT="$(cat jobs/daily.md)
+
+          ## This run
+          Do all steps. Today is $TODAY."
+          fi
+          npx -y @anthropic-ai/claude-code@latest -p "$PROMPT" \
+            --model sonnet --max-turns 150 --permission-mode acceptEdits \
+            --allowedTools 'Read,Grep,Glob,Write,WebSearch,WebFetch,Bash(node scripts/db.mjs:*),Bash(cat:*),Bash(ls:*),Bash(date:*),Bash(mktemp:*),Bash(rm /tmp/*)' \
+            | tee "$RUNNER_TEMP/out.md"
+          echo "### Cloud job ($KIND)" >> "$GITHUB_STEP_SUMMARY"; tail -c 4000 "$RUNNER_TEMP/out.md" >> "$GITHUB_STEP_SUMMARY"

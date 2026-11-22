@@ -1,2 +1,8 @@
 node_modules/
-*.log
+dist/
+.netlify/
+.env
+*.local
+# personal data exports never go in the repo
+*backup*.json
+learning-galaxy-export/

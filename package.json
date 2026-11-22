@@ -1,0 +1,14 @@
+{
+  "name": "learning-galaxy",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Learning Galaxy: study HUD with Jarvis, as an installable PWA",
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "build": "node scripts/build.mjs",
+    "icons": "node scripts/render-icons.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
