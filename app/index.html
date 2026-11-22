@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Galaxy">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<script>(function(){var t=null;try{t=JSON.parse(localStorage.getItem('lg.app.theme')||'null');}catch(e){}if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<script>(function(){var t=null;try{t=JSON.parse(localStorage.getItem('lg.app.theme')||'null');}catch(e){}var h=document.documentElement.getAttribute('data-theme');if(t!=='light'&&t!=='dark')t=(h==='light'||h==='dark')?h:matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 <meta name="color-scheme" content="dark light">
 <script src="config.js"></script>
 <script src="lg-store.js"></script>

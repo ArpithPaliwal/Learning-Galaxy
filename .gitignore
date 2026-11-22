@@ -9,3 +9,5 @@ learning-galaxy-export/
 supabase/.temp/
 supabase/.branches/
 .superpowers/
+
+dist-artifact/

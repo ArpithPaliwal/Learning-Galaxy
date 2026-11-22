@@ -8,7 +8,10 @@
     "check": "node scripts/check.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
     "build": "node scripts/build.mjs",
-    "icons": "node scripts/render-icons.mjs"
+    "icons": "node scripts/render-icons.mjs",
+    "build:artifact": "node scripts/build-artifact.mjs"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

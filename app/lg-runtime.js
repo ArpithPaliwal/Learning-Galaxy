@@ -10,6 +10,10 @@
  * It also exposes window.LG for the App panel (lg-app.js) and Jarvis' build_feature action. */
 (function () {
   'use strict';
+  // Inside a claude.ai artifact the platform provides the real window.claude (db, sample, downloads, ...).
+  // Then this file must not replace it: data lives in the artifact database and Jarvis runs on the viewer's Claude account.
+  const NATIVE = (window.claude && typeof window.claude.use === 'function') ? window.claude : null;
+  const ARTIFACT = !!NATIVE;
   const CONF = Object.assign({ repo: 'ArpithPaliwal/Learning-Galaxy', branch: 'main', supabaseUrl: '', supabaseAnonKey: '' }, window.LG_CONFIG || {});
 
   /* ---------- settings (per device) ---------- */
@@ -23,7 +27,60 @@
   const err = (code, msg, extra) => Object.assign(new Error(msg || code), { code, text: msg || '' }, extra || {});
 
   /* ---------- store ---------- */
-  const store = window.LGStore.createStore({ name: 'learning-galaxy' });
+  /* Artifact store: mirrors the artifact database into memory (counts, export, imports); db calls pass straight through. */
+  const LG_COLS = ['meta', 'plans', 'courses', 'topics', 'paths', 'tasks', 'done', 'research', 'news', 'problems', 'categories', 'tracks', 'jarvis', 'sessions', 'trends', 'usage'];
+  function artifactStore() {
+    const docs = new Map(), hooks = new Set(); let realDb = null, done;
+    const ready = new Promise((res) => (done = res));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    (async () => {
+      try { realDb = await NATIVE.use('db'); } catch (e) { realDb = null; }
+      if (!realDb) { done(); return; }
+      let left = LG_COLS.length; const one = () => { if (--left === 0) done(); };
+      for (const c of LG_COLS) {
+        let first = true;
+        realDb.collection(c).onSnapshot((snap) => {
+          for (const k of [...docs.keys()]) if (k.startsWith(c + '/')) docs.delete(k);
+          for (const d of snap.docs) docs.set(c + '/' + d.id, d.data());
+          if (first) { first = false; one(); }
+          for (const h of hooks) { try { h(new Set([c])); } catch (e) {} }
+        }, () => { if (first) { first = false; one(); } });
+      }
+      setTimeout(done, 6000);
+    })();
+    return {
+      ready, flush: async () => {},
+      get db() { return realDb; },
+      onChange(fn) { hooks.add(fn); return () => hooks.delete(fn); },
+      dirty: () => [], markClean() {},
+      count: () => docs.size,
+      get: (p) => { const d = docs.get(p); return d ? JSON.parse(JSON.stringify(d)) : undefined; },
+      exportAll() { const out = {}; for (const [p, d] of docs) { const i = p.indexOf('/'); (out[p.slice(0, i)] = out[p.slice(0, i)] || {})[p.slice(i + 1)] = d; } return JSON.parse(JSON.stringify(out)); },
+      // the public daily feed: only write items that are not stored yet
+      applyRemote(r) { if (!realDb || docs.has(r.path) || r.deleted) return false; docs.set(r.path, r.data); realDb.doc(r.path).set(r.data).catch(() => {}); return true; },
+      async importAll(obj, onProgress) {
+        await ready; if (!realDb) throw err('no_db', 'The artifact database is not available here.');
+        const jobs = [];
+        for (const [col, byId] of Object.entries(obj || {})) {
+          if (!byId || typeof byId !== 'object' || !/^[A-Za-z0-9_.~:@+-]+$/.test(col)) continue;
+          for (const [id, data] of Object.entries(byId)) if (data && typeof data === 'object' && /^[A-Za-z0-9_.~:@+-]{1,200}$/.test(id)) { const { id: _x, ...rest } = data; jobs.push([col + '/' + id, rest]); }
+        }
+        let n = 0, i = 0;
+        const lanes = Array.from({ length: 4 }, async () => {
+          for (;;) {
+            const j = jobs[i++]; if (!j) return;
+            for (let t = 0; t < 6; t++) {
+              try { await realDb.doc(j[0]).set(j[1]); n++; break; }
+              catch (e) { if (e && (e.code === 'resource_exhausted' || e.code === 'unavailable') && t < 5) await sleep(600 * (t + 1)); else if (e && e.code === 'quota_exceeded') throw e; else break; }
+            }
+            if (onProgress && n % 25 === 0) onProgress(n, jobs.length);
+          }
+        });
+        await Promise.all(lanes); return n;
+      },
+    };
+  }
+  const store = ARTIFACT ? artifactStore() : window.LGStore.createStore({ name: 'learning-galaxy' });
   store.onChange(() => { emit('data'); Sync.soon(); });
 
   /* ---------- AI: any provider (same list as the Expenses app) ---------- */
@@ -207,7 +264,7 @@
     const state = { status: 'off', last: cfg.get('sync.last', 0), error: '' };
     const sb = () => ({ url: (cfg.get('sb.url', '') || CONF.supabaseUrl || '').replace(/\/+$/, ''), key: cfg.get('sb.key', '') || CONF.supabaseAnonKey || '' });
     const session = () => cfg.get('sb.session', null);
-    const configured = () => !!(sb().url && sb().key);
+    const configured = () => !ARTIFACT && !!(sb().url && sb().key);
     const signedIn = () => !!(session() && session().refresh_token);
     const set = (s, e = '') => { state.status = s; state.error = e; emit('sync', Object.assign({}, state)); };
     async function auth(path, body) {
@@ -314,6 +371,7 @@
     async function requestFeature(title, details, o = {}) {
       title = String(title || '').trim().slice(0, 90); if (!title) throw err('empty', 'Give the feature a name.');
       const body = issueBody(details, o);
+      if (ARTIFACT) { const url = 'https://github.com/' + repo() + '/issues/new?title=' + encodeURIComponent('Feature: ' + title) + '&body=' + encodeURIComponent(body); emit('feature-link', { url, title }); return { url, number: null, link: true }; }
       if (!tok()) {
         const u = 'https://github.com/' + repo() + '/issues/new?title=' + encodeURIComponent('Feature: ' + title) + '&body=' + encodeURIComponent(body);
         window.open(u, '_blank', 'noopener');
@@ -355,10 +413,10 @@
     },
     permissions: { async state() { return 'granted'; }, async manage() { window.LG && window.LG.openPanel && window.LG.openPanel('ai'); } },
   };
-  window.claude = { use: async (name) => { if (name === 'db') await store.ready; return caps[name] || null; } };
+  if (!ARTIFACT) window.claude = { use: async (name) => { if (name === 'db') await store.ready; return caps[name] || null; } };
 
   /* make sure the app's "cloud job" buttons are enabled: it checks meta/refresh for trigger ids */
-  store.ready.then(() => { const r = store.get('meta/refresh'); if (!r || !r.triggerId || !r.courseTriggerId) store.db.doc('meta/refresh').set(Object.assign({}, r || {}, { triggerId: (r && r.triggerId) || 'gh-daily', courseTriggerId: (r && r.courseTriggerId) || 'gh-courses' })); });
+  if (!ARTIFACT) store.ready.then(() => { const r = store.get('meta/refresh'); if (!r || !r.triggerId || !r.courseTriggerId) store.db.doc('meta/refresh').set(Object.assign({}, r || {}, { triggerId: (r && r.triggerId) || 'gh-daily', courseTriggerId: (r && r.courseTriggerId) || 'gh-courses' })); });
 
   /* ---------- public daily feed (news, trending, tools, videos) ----------
    * feed/latest.json is published with the app (it is not personal). Every device merges it into its
@@ -379,7 +437,7 @@
   }
   loadFeed(); setInterval(loadFeed, 3 * 3600e3);
 
-  window.LG = Object.assign(window.LG || {}, { cfg, bus, store, loadFeed, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
+  window.LG = Object.assign(window.LG || {}, { ARTIFACT, NATIVE, cfg, bus, store, loadFeed, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
 
   Sync.handleRedirect().finally(() => Sync.soon(400));
 })();

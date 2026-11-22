@@ -309,6 +309,7 @@
   }
 
   LG.store.ready.then(() => {
+    if (!LG.store.db) return; // no database in this view
     watch('categories'); watch('topics'); watch('news', LG.store.db.collection('news').orderBy('date', 'desc').limit(80));
     const safe = (fn) => { try { fn(); } catch (e) { console.warn('lg-visuals', e); } };
     const go = () => { safe(mountJarvisCore); safe(mountGalaxy); safe(mountRadar); };

@@ -65,7 +65,7 @@
   function applyTheme() { const t = curTheme(); document.documentElement.setAttribute('data-theme', t === 'system' ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : t); }
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (curTheme() === 'system') applyTheme(); });
   function paintTheme() { const b = $('#lgThemeBtn'); if (!b) return; const [ic, label] = THEMES[curTheme()]; b.textContent = ic; b.title = label + ' (tap to change)'; b.setAttribute('aria-label', label); }
-  function paintDot() { const d = $('#lgDot'); if (!d) return; const s = LG.Sync.state.status; d.className = 'lg-dot ' + s; d.title = { ok: 'Synced', syncing: 'Syncing…', error: 'Sync error: ' + LG.Sync.state.error, offline: 'Offline — saved on this device', signed_out: 'Sync: not signed in', off: 'Saved on this device (cloud sync off)' }[s] || s; }
+  function paintDot() { const d = $('#lgDot'); if (!d) return; if (LG.ARTIFACT) { d.className = 'lg-dot ok'; d.title = 'Saved in this artifact’s database, synced across your devices by claude.ai'; return; } const s = LG.Sync.state.status; d.className = 'lg-dot ' + s; d.title = { ok: 'Synced', syncing: 'Syncing…', error: 'Sync error: ' + LG.Sync.state.error, offline: 'Offline — saved on this device', signed_out: 'Sync: not signed in', off: 'Saved on this device (cloud sync off)' }[s] || s; }
   LG.bus.addEventListener('sync', () => { paintDot(); if (panelTab === 'sync') draw(); });
 
   /* ---------- install prompt ---------- */
@@ -100,7 +100,38 @@
     ({ home, ai, sync, build, data })[panelTab](body);
   }
 
+  /* ---------- claude.ai artifact edition: same panel, different plumbing ---------- */
+  const EDITION = LG.ARTIFACT
+    ? 'This is the claude.ai edition of Learning Galaxy. Jarvis runs on your Claude account (no key needed) and your data lives in this artifact’s own database, which syncs across your devices through claude.ai. The installed app keeps its data in Supabase.'
+    : '';
+  function artifactHome(el) {
+    const row = (ok, t, d, tab) => `<div class="lg-build"><div><b style="font-size:14px">${ok ? '✓' : '○'} ${t}</b><div class="faint" style="font-size:12.5px">${d}</div></div>${tab ? `<button class="btn small" data-go="${tab}">Open</button>` : ''}</div>`;
+    el.innerHTML = `<p class="lg-note">${esc(EDITION)}</p>
+      <div class="lg-builds">
+        ${row(true, 'AI brain', 'Jarvis, courses and quizzes use your Claude account. Nothing to set up.', 'ai')}
+        ${row(LG.store.count() > 0, 'Your data', LG.store.count() + ' records in this artifact’s database, synced across your devices.', 'data')}
+        ${row(true, 'Data sharing with the installed app', 'Download a backup here, import it in the app (or the other way round).', 'sync')}
+        ${row(true, 'Request a feature', 'Opens a prefilled GitHub issue; Claude builds and ships it to the installed app.', 'build')}
+      </div>
+      <div class="field"><span class="label">Appearance</span><div class="row">${Object.entries(THEMES).map(([k, [ic]]) => `<button class="btn small ${k === curTheme() ? 'primary' : ''}" data-theme-set="${k}">${ic} ${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>`;
+    el.querySelectorAll('[data-theme-set]').forEach((b) => (b.onclick = () => setTheme(b.dataset.themeSet)));
+    el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { panelTab = b.dataset.go; draw(); }));
+  }
+  function artifactAi(el) {
+    el.innerHTML = `<p class="lg-note">Jarvis, course drafting, quizzes and teach-back run on <b>your Claude account</b> in this edition. There is no API key to paste. The first time, Claude asks you to allow it for this page; use the page menu → Permissions if you need to change that.</p>
+      <p class="lg-note">Want a different model or a free provider (Groq, Gemini…)? Use the installed app, which accepts a key from any provider.</p>
+      <div class="row"><button class="btn" id="aiPerm">Open permissions</button></div>`;
+    $('#aiPerm', el).onclick = async () => { try { const p = await window.claude.use('permissions'); await p.manage(); } catch (e) { toast('Open the page menu → Permissions.'); } };
+  }
+  function artifactSync(el) {
+    el.innerHTML = `<p class="lg-note">claude.ai artifacts cannot reach other websites, so this edition cannot sync live with the installed app’s Supabase database. It has its own database that syncs across all your devices inside claude.ai.</p>
+      <p class="lg-note"><b>To move data between the two editions</b> (any time, both ways): ⚡ App → <b>Data</b> → Download a backup in one, then Import a backup in the other. Importing merges and replaces records with the same id.</p>
+      <div class="row"><button class="btn primary" id="sbGo">Open Data</button></div>`;
+    $('#sbGo', el).onclick = () => { panelTab = 'data'; draw(); };
+  }
+
   function home(el) {
+    if (LG.ARTIFACT) return artifactHome(el);
     const ai = LG.aiCfg(), s = LG.Sync.state;
     const row = (ok, t, d, tab) => `<div class="lg-build"><div><b style="font-size:14px">${ok ? '✓' : '○'} ${t}</b><div class="faint" style="font-size:12.5px">${d}</div></div>${tab ? `<button class="btn small" data-go="${tab}">${ok ? 'Change' : 'Set up'}</button>` : ''}</div>`;
     el.innerHTML = `<p class="lg-note">This is your Learning Galaxy as a real app: it works offline, installs to your home screen, and keeps its data on this device. Set up the pieces below once.</p>
@@ -119,6 +150,7 @@
   }
 
   function ai(el) {
+    if (LG.ARTIFACT) return artifactAi(el);
     const c = LG.cfg.get('ai', {}) || {}; const cur = LG.aiCfg(); const P = LG.PROVIDERS[cur.provider]; const adv = Object.assign({}, P.adv || {}, c.adv || {});
     const opts = Object.entries(LG.GROUPS).map(([g, gl]) => `<optgroup label="${esc(gl)}">${Object.entries(LG.PROVIDERS).filter(([, p]) => p.group === g).map(([k, p]) => `<option value="${k}" ${k === cur.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</optgroup>`).join('');
     const showBase = cur.provider === 'custom' || cur.provider === 'azure' || P.group === 'local' || !!c.base;
@@ -180,6 +212,7 @@
   }
 
   function sync(el) {
+    if (LG.ARTIFACT) return artifactSync(el);
     const p = LG.Sync.project(), s = LG.Sync.state, ses = LG.Sync.session();
     const status = { ok: '✓ Synced' + (s.last ? ' at ' + new Date(s.last).toLocaleTimeString() : ''), syncing: 'Syncing…', error: '✕ ' + esc(s.error), offline: 'Offline. Changes are saved here and sync when you are back online.', signed_out: 'Not signed in.', off: 'Off. Data is saved on this device only.' }[s.status] || s.status;
     el.innerHTML = `<p class="lg-note">Your data is always saved on this device first. Cloud sync copies it to your own free <b>Supabase</b> database so your phone, tablet and PC stay in step. Setup steps are in <code>docs/SETUP.md</code> in the repo.</p>
@@ -206,7 +239,26 @@
   const FR_HINT = { claude: 'Claude Code builds it, the checks run, and it ships to this app by itself.', copilot: 'Saved as an issue for GitHub Copilot. Assign it to Copilot on GitHub to build it.', manual: 'Saved as an idea on GitHub. Comment @claude on it any time to have Claude build it.' };
   const pills = (label, key, opts) => `<div class="field"><span class="label">${label}</span><div class="row" style="gap:6px">${opts.map(([v, l]) => `<button class="btn small ${fr()[key] === v ? 'primary' : ''}" data-fr="${key}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
 
+  // a request made in the artifact edition cannot call GitHub, so it ends in a link the viewer opens
+  let pendingLink = null;
+  LG.bus.addEventListener('feature-link', (e) => { pendingLink = e.detail; openPanel('build'); });
+  function artifactBuild(el) {
+    el.innerHTML = `<p class="lg-note">Ask for any feature (here or just tell Jarvis). You get a prefilled GitHub issue: press <b>Submit new issue</b> on GitHub, then Claude Code builds, tests and ships it to the installed app, usually in 10–20 minutes.</p>
+      <div class="field"><span class="label">What should Claude build?</span><input class="inp" id="frT" placeholder="e.g. Flashcard streak calendar on Today"><textarea class="inp" id="frD" rows="3" placeholder="Details: where it goes, how it should look and behave"></textarea></div>
+      ${pills('Builder', 'builder', [['claude', 'Claude'], ['copilot', 'Copilot'], ['manual', 'Save only']])}
+      <div id="frClaude" ${fr().builder === 'claude' ? '' : 'hidden'}>${pills('Model', 'model', [['sonnet', 'Sonnet'], ['opus', 'Opus'], ['haiku', 'Haiku']])}${pills('When?', 'when', [['now', 'Ship now'], ['scheduled', 'Within 6h']])}</div>
+      <div class="row"><button class="btn primary" id="frGo">✨ Prepare the request</button></div>
+      ${pendingLink ? `<div class="lg-build"><div><b style="font-size:14px">${esc(pendingLink.title)}</b><div class="faint" style="font-size:12.5px">Open GitHub and press Submit new issue.</div></div><a class="btn primary" href="${esc(pendingLink.url)}" target="_blank" rel="noopener">Open on GitHub ↗</a></div>` : ''}
+      <p class="lg-note"><a href="https://github.com/${esc(LG.GH.repo())}/issues" target="_blank" rel="noopener">See all requests and their status on GitHub ↗</a></p>`;
+    el.querySelectorAll('[data-fr]').forEach((b) => (b.onclick = () => { LG.cfg.set('fr', Object.assign(fr(), { [b.dataset.fr]: b.dataset.v })); draw(); }));
+    $('#frGo', el).onclick = async () => {
+      const t = $('#frT', el).value.trim(); if (!t) { toast('Write what to build first.'); return; }
+      pendingLink = (await LG.GH.requestFeature(t, $('#frD', el).value, Object.assign({ source: 'Artifact panel' }, fr()))) && pendingLink; draw();
+    };
+  }
+
   function build(el) {
+    if (LG.ARTIFACT) return artifactBuild(el);
     el.innerHTML = `<p class="lg-note">Ask for any feature (here or just tell Jarvis). It becomes a GitHub issue; a GitHub Action runs <b>Claude Code</b> on it, checks it, and ships it to this app automatically, usually in 10–20 minutes. Reopen the app to get the new version.</p>
       <div class="field"><span class="label">What should Claude build?</span><input class="inp" id="frT" placeholder="e.g. Flashcard streak calendar on Today"><textarea class="inp" id="frD" rows="3" placeholder="Details: where it goes, how it should look and behave"></textarea></div>
       ${pills('Builder', 'builder', [['claude', 'Claude'], ['copilot', 'Copilot'], ['manual', 'Save only']])}
@@ -245,7 +297,10 @@
     $('#dExp', el).onclick = () => window.claude.use('downloads').then((d) => d.save({ filename: 'learning-galaxy-' + new Date().toISOString().slice(0, 10) + '.json', data: JSON.stringify(LG.store.exportAll()) }));
     $('#dImp', el).onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
-      try { const n = LG.store.importAll(JSON.parse(await f.text())); toast('Imported ' + n + ' records.'); LG.Sync.soon(500); draw(); } catch (er) { toast('That file is not a Learning Galaxy backup.'); }
+      let obj; try { obj = JSON.parse(await f.text()); } catch (er) { toast('That file is not a Learning Galaxy backup.'); return; }
+      if (!obj || typeof obj !== 'object' || Array.isArray(obj)) { toast('That file is not a Learning Galaxy backup.'); return; }
+      try { toast('Importing…'); const n = await LG.store.importAll(obj, (done, total) => toast('Importing ' + done + ' of ' + total + '…')); toast('Imported ' + n + ' records.'); LG.Sync.soon(500); draw(); }
+      catch (er) { toast(er && er.code === 'quota_exceeded' ? 'The database is full. Delete some old news or problems first.' : 'Import stopped: ' + ((er && er.message) || 'unknown error')); }
     };
   }
 
@@ -254,12 +309,13 @@
   /* ---------- first run ---------- */
   LG.store.ready.then(() => {
     mountButton();
-    if (!LG.store.count() || !(LG.aiCfg().key || LG.aiCfg().noKey)) setTimeout(() => { if (!document.querySelector('.modal:not([hidden])')) openPanel(LG.store.count() > 1 ? 'ai' : 'home'); }, 900);
+    if (LG.ARTIFACT) { if (!LG.store.count()) setTimeout(() => { if (!document.querySelector('.modal:not([hidden])')) openPanel('data'); }, 900); }
+    else if (!LG.store.count() || !(LG.aiCfg().key || LG.aiCfg().noKey)) setTimeout(() => { if (!document.querySelector('.modal:not([hidden])')) openPanel(LG.store.count() > 1 ? 'ai' : 'home'); }, 900);
   });
   if (document.readyState !== 'loading') mountButton(); else document.addEventListener('DOMContentLoaded', mountButton);
 
   /* ---------- service worker + update banner ---------- */
-  if ('serviceWorker' in navigator && location.protocol !== 'file:' && !/localhost:\d+$/.test(location.host) || ('serviceWorker' in navigator && location.search.includes('sw=1'))) {
+  if (!LG.ARTIFACT && ('serviceWorker' in navigator && location.protocol !== 'file:' && !/localhost:\d+$/.test(location.host) || ('serviceWorker' in navigator && location.search.includes('sw=1')))) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then((reg) => {
         reg.addEventListener('updatefound', () => {
