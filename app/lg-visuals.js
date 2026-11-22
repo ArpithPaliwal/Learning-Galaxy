@@ -274,7 +274,7 @@
     cv.addEventListener('click', () => { if (hover && /^https?:/.test(hover.n.url || '')) window.open(hover.n.url, '_blank', 'noopener'); });
     function draw(g, W, H, now, dt) {
       const K = kit();
-      const cx = W / 2, cy = H / 2 + 16, R = Math.min(W, H) * 0.42; beam = (beam + dt * 1.25) % 6.283;
+      const cx = W / 2, cy = H / 2 + (W < 560 ? -40 : 16), R = Math.min(W, H) * 0.42; beam = (beam + dt * 1.25) % 6.283;
       g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
       const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); bg.addColorStop(0, K.bg0); bg.addColorStop(0.45, K.bg1); bg.addColorStop(1, K.bg2); g.fillStyle = bg; g.fillRect(0, 0, W, H);
       // rings, cross, ticks

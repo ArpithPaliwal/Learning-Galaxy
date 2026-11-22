@@ -262,3 +262,30 @@ details.acc{border-radius:var(--r-md);background:var(--panel);overflow:hidden}
 
 /* never show Netlify's injected badge */
 #nl-hud-frame,#nl-badge-frame,iframe#nl-hud-frame{display:none!important}
+
+/* ---------- layouts follow the space the page actually has ---------- */
+/* With the desktop sidebar and the Jarvis panel both open the content column can be ~470px wide even on a
+   1200px window, so media queries (which only see the window) leave two cramped columns. Container queries
+   on <main> collapse the multi-column layouts by the width they really get. */
+main{container-type:inline-size;container-name:pg}
+@container pg (max-width:780px){
+  .grid2,.rd-grid,.gx{grid-template-columns:minmax(0,1fr)}
+  .sm-lanes{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sm-brief{grid-template-columns:minmax(0,1fr)}
+  .sm-wrap:has(.sm-panel:not([hidden])){grid-template-columns:minmax(0,1fr)}
+  .sm-panel{position:static;max-height:none;order:-1}
+  .ask .opts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .ask .opts .go{grid-column:1 / -1}
+}
+@container pg (max-width:520px){
+  .sm-lanes{grid-template-columns:minmax(0,1fr)}
+  .hello{flex-direction:column;align-items:stretch}
+  .stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%}
+  .stat{min-width:0}
+}
+/* narrow content column: the radar's target-lock card becomes a compact strip under the radar */
+@container pg (max-width:780px){
+  .lgv-rd{height:min(86vh,660px)}
+  .lgv-rd .lgv-lock{top:auto;bottom:56px;left:12px;right:12px;width:auto;max-height:92px;overflow:hidden;padding:8px 12px}
+  .lgv-rd .lgv-lock b{font-size:14px;margin:2px 0}
+}
