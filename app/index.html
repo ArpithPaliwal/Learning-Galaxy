@@ -122,6 +122,7 @@ textarea.inp{resize:vertical;min-height:44px;line-height:1.5}
 
 /* today */
 .hello{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.hello .dquote{margin-top:6px;max-width:46ch;font-size:12px;line-height:1.5;color:var(--fg-2);font-style:italic;overflow-wrap:anywhere}
 .hello h1{font:700 clamp(22px,3vw,30px)/1.2 var(--f-hud);letter-spacing:.04em;color:var(--fg);text-shadow:0 0 18px rgb(var(--c-acc) / .35)}
 .stats{display:flex;gap:10px;flex-wrap:wrap}
 .stat{border:1px solid var(--line);background:rgb(var(--c-acc) / .04);padding:8px 14px;min-width:110px}
@@ -716,7 +717,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
       <!-- TODAY -->
       <section class="view" id="v-today">
         <div class="hello">
-          <div><div class="label" id="tDate"></div><h1 id="tHello">Hello</h1></div>
+          <div><div class="label" id="tDate"></div><h1 id="tHello">Hello</h1><div class="dquote" id="tQuote"></div></div>
           <div class="stack" style="gap:10px;align-items:flex-end"><div class="row"><button class="btn primary" id="briefBtn">▶ Brief me</button><button class="btn" id="focusBtn">◷ Focus</button><button class="btn" id="battleBtn">⚔ Training sim</button><button class="btn" id="labBtn">🧪 Neural Lab</button><button class="btn" id="attBtn">🔍 Attention</button></div><div class="row hero-stats"><div class="dreac" id="tReactor"></div><div class="stats" id="tStats"></div></div></div>
         </div>
         <div class="grid2">
@@ -969,6 +970,8 @@ const del = (c, id) => S.db ? q(c+'/'+id, () => S.db.doc(c+'/'+id).delete()) : P
 let rq = false; const renderers = [];
 function render(){ if (rq) return; rq = true; requestAnimationFrame(() => { rq = false; for (const r of renderers) { try { r(); } catch(e){ console.error(e); } } }); }
 
+const QUOTES = ['Small steps every day beat big bursts once a month.','You don’t have to be great to start, but you have to start to be great.','Understanding grows when you try to explain it.','Mistakes are just your brain updating its map.','Consistency is the quiet superpower of learning.','One focused hour today is worth a distracted afternoon.','Curiosity is the engine; practice is the road.','What you revisit, you remember.','Progress, not perfection.','Learn it, build it, teach it.','Hard means your brain is growing.','Today’s effort is tomorrow’s instinct.','Start with ten minutes; momentum does the rest.','Every expert was once a beginner who kept going.','Rest is part of learning; come back sharp.'];
+function dailyQuote(d){ d = d || new Date(); return QUOTES[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) % QUOTES.length]; }
 async function connect(){
   if (!window.claude || typeof window.claude.use !== 'function') { $('#tHello').textContent = 'Loading…'; return; }
   const use = n => window.claude.use(n).catch(() => null);
@@ -1020,6 +1023,7 @@ renderers.push(function today_(){
   const p = profile(); const h = new Date().getHours();
   $('#tDate').textContent = new Date().toLocaleDateString(undefined, {weekday:'long', day:'numeric', month:'long'});
   $('#tHello').textContent = `${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}${p.name ? ', '+p.name : ''}`;
+  $('#tQuote').textContent = dailyQuote();
   const target = (Number(p.hours)||4)*60, wm = weekMinutesDone();
   $('#tStats').innerHTML = `<div class="stat"><b>${streak()}</b><span>day streak</span></div><div class="stat"><b>${fmtMin(wm + focusMinutesWeek())}</b><span>of ${fmtMin(target)} this week</span></div><div class="stat"><b>${[...C('done').values()].filter(d => String(d.date||'') >= weekStart()).length}</b><span>wins this week</span></div>`;
   const n = nextThing();
