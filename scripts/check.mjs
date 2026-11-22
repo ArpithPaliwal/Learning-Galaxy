@@ -37,6 +37,8 @@ for (const [, src] of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
 if (!html.includes('class="top"') || !html.includes('class="right"')) fail('top bar (.top .right) is missing: the ⚡ App button mounts there');
 if (!html.includes("case 'build_feature'")) fail("Jarvis lost the build_feature action");
 JSON.parse(readFileSync('app/manifest.webmanifest', 'utf8')); ok('manifest is valid JSON');
+// installability: browsers refuse a manifest sent as octet-stream (we also send nosniff)
+if (!/for = "/manifest.webmanifest"[sS]*?Content-Type = "application/manifest+json"/.test(readFileSync('netlify.toml', 'utf8'))) fail('netlify.toml must serve manifest.webmanifest as application/manifest+json'); else ok('manifest content type set for install');
 
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');
