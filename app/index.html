@@ -1276,7 +1276,8 @@ $('#settingsBtn').onclick = () => { const p = profile(); const m = C('meta').get
       <div class="slid"><span>Pitch</span><input type="range" id="sPitch" min="0.5" max="1.5" step="0.02"><b class="mono" id="sPitchV"></b></div>
       <div class="slid"><span>Speed</span><input type="range" id="sRate" min="0.7" max="1.5" step="0.02"><b class="mono" id="sRateV"></b></div>
       <div class="row"><select class="inp" id="sVoice" style="flex:1 1 200px"></select><button class="btn small" id="sTest">▶ Test</button></div>
-      <span class="faint" style="font-size:12.5px">Voices come from your device. Chrome and Edge have the most (look for "UK English", "Daniel", "Libby", "Ryan"). Choose a Claude voice for smoother speech in the desktop app.</span></div>
+      <span class="faint" style="font-size:12.5px">Voices come from your device. Chrome and Edge on a PC have the most (look for "UK English", "Daniel", "Libby", "Ryan"). On Android phones Chrome usually offers one voice per language: to get a male voice, open Android Settings → Text-to-speech output → Google engine ⚙ → Install voice data → English (UK/India/US) → pick a male voice; Jarvis will then use it.</span>
+      <label class="row" style="gap:8px;font-size:13.5px"><input type="checkbox" class="check" id="sDeep" ${LS.get('deepenVoice', true) ? 'checked' : ''}> Deepen the voice for male personas when the device has no male voice</label></div>
     <div class="card" style="background:var(--bg-2)"><div class="label">Daily Claude job</div><p style="font-size:14px;margin-top:6px">${m.lastRun ? 'Last ran '+esc(new Date(m.lastRun).toLocaleString()) : 'Not run yet'}. It finds course videos, builds study kits, researches and adds news every morning.</p>${m.lastDigest ? `<p class="faint" style="font-size:13px;margin-top:6px">${esc(m.lastDigest)}</p>` : ''}<div class="row" style="margin-top:10px"><button class="btn small" id="sRun" ${botReady('daily') ? '' : 'disabled'}>Run it now</button><button class="btn small ghost" id="sMic">🎙 Mic check</button><button class="btn small ghost" id="sAudit">🧾 Token audit</button>${S.downloads ? '<button class="btn small ghost" id="sBackup">Download a backup</button>' : ''}</div></div>
     <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="sSave">Save</button></div>`, () => {
     const drawStudio = () => { const P = persona(); loadVoices();
@@ -1295,6 +1296,7 @@ $('#settingsBtn').onclick = () => { const p = profile(); const m = C('meta').get
     $('#sPitch').onchange = $('#sRate').onchange = () => say(persona().hello, true);
     $('#sVoice').onchange = () => { applyVoice(); say(persona().hello, true); }; $('#sTest').onclick = () => { applyVoice(); say(persona().hello + ' Your study plan is ready.', true); };
     $('#sSave').onclick = () => { put('meta', 'profile', {name: $('#sName').value.trim(), hours: Number($('#sHours').value)||4, goals: $('#sGoals').value.trim()}); closeModal(); toast('Saved.'); };
+    $('#sDeep') && ($('#sDeep').onchange = (e) => { LS.set('deepenVoice', e.target.checked); say(persona().hello, true); });
     $('#sMic').onclick = () => openMicTest();
     $('#sAudit').onclick = () => openAudit();
     $('#sRun').onclick = async () => { const ok = await fireBot('daily'); toast(ok ? 'Started. Results appear in a few minutes.' : 'Could not start it. Add a GitHub token in ⚡ App → Builder.'); };
@@ -1332,7 +1334,10 @@ function say(text, force, pOverride){
     const parts = text.match(/[^.!?]+[.!?]*\s*/g) || [text]; const voice = jarvisVoice(); const P0 = persona(); previewP = null; let i = 0; setSpeaking(true);
     const next = () => { if (i >= parts.length) { setSpeaking(false); res(); return; } const u = new SpeechSynthesisUtterance(parts[i++].trim());
       if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = 'en-GB';
-      const P = P0; u.rate = Number(LS.get('voiceRate.'+P.id, P.rate)); u.pitch = Number(LS.get('voicePitch.'+P.id, P.pitch)); u.onend = next; u.onerror = () => { setSpeaking(false); res(); }; speechSynthesis.speak(u); };
+      const P = P0; u.rate = Number(LS.get('voiceRate.'+P.id, P.rate)); u.pitch = Number(LS.get('voicePitch.'+P.id, P.pitch));
+      // Phones (Android Chrome) often offer only a female voice. For male personas, deepen it so it sounds closer.
+      if (P.sex === 'm' && !(voice && MALE.test(voice.name)) && LS.get('deepenVoice', true)) u.pitch = Math.max(0.35, u.pitch * 0.68);
+      u.onend = next; u.onerror = () => { setSpeaking(false); res(); }; speechSynthesis.speak(u); };
     next(); });
   if (S.tts) { previewP = null; setSpeaking(true); return S.tts.speak(text, {voice: LS.get('claudeVoice', 'glassy'), rate: Math.max(0.7, Math.min(1.5, Number(LS.get('voiceRate.'+persona().id, persona().rate))))}).catch(() => {}).finally(() => setSpeaking(false)); }
   return Promise.resolve();
