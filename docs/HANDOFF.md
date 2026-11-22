@@ -40,3 +40,6 @@ npx -y supabase@3.2.0 projects list             # CLI is logged in on this PC
 gh secret list -R ArpithPaliwal/Learning-Galaxy
 gh run list -R ArpithPaliwal/Learning-Galaxy
 ```
+
+## In progress (2026-11-22): UI redesign "Deep space blue"
+User picked mockup C2 (black + faint stars, deep-blue hero), wants blue, light theme, phone/tablet/PC. Done: app/theme.css design layer (dark+light tokens, sidebar on desktop, bottom bar on phone, nebula "Up next" card), CSS colours tokenized in index.html, theme toggle (top bar + App panel). Not yet: screenshot review in light+dark at 3 widths, fix JS inline dark colours that look wrong in light theme, deploy (Netlify MCP), Learn/Jarvis tab restructure was proposed but not built. Mockups: .superpowers/brainstorm/.

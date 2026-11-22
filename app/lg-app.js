@@ -43,8 +43,22 @@
     b.innerHTML = '<i class="lg-dot" id="lgDot"></i><span class="t">⚡ App</span>';
     b.onclick = () => openPanel();
     right.insertBefore(b, right.firstChild);
-    paintDot();
+    const t = document.createElement('button');
+    t.id = 'lgThemeBtn'; t.className = 'iconbtn'; t.onclick = () => setTheme(nextTheme());
+    right.insertBefore(t, b.nextSibling);
+    paintTheme(); paintDot();
   }
+
+  /* ---------- theme: system → light → dark ---------- */
+  const THEMES = { system: ['◐', 'Theme: follows your device'], light: ['☀', 'Theme: light'], dark: ['☾', 'Theme: dark'] };
+  const curTheme = () => { const t = LG.cfg.get('theme', 'system'); return THEMES[t] ? t : 'system'; };
+  const nextTheme = () => ({ system: 'light', light: 'dark', dark: 'system' })[curTheme()];
+  function setTheme(t) {
+    LG.cfg.set('theme', t === 'system' ? null : t);
+    if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
+    paintTheme(); toast(THEMES[t][1]); if (panelTab === 'home') draw();
+  }
+  function paintTheme() { const b = $('#lgThemeBtn'); if (!b) return; const [ic, label] = THEMES[curTheme()]; b.textContent = ic; b.title = label + ' (tap to change)'; b.setAttribute('aria-label', label); }
   function paintDot() { const d = $('#lgDot'); if (!d) return; const s = LG.Sync.state.status; d.className = 'lg-dot ' + s; d.title = { ok: 'Synced', syncing: 'Syncing…', error: 'Sync error: ' + LG.Sync.state.error, offline: 'Offline — saved on this device', signed_out: 'Sync: not signed in', off: 'Saved on this device (cloud sync off)' }[s] || s; }
   LG.bus.addEventListener('sync', () => { paintDot(); if (panelTab === 'sync') draw(); });
 
@@ -91,7 +105,9 @@
         ${row(LG.GH.hasToken(), 'Claude builder', LG.GH.hasToken() ? 'Jarvis can file and track feature builds.' : 'Ask for a feature and Claude builds and ships it.', 'build')}
         ${row(LG.store.count() > 0, 'Your data', LG.store.count() + ' records on this device', 'data')}
       </div>
+      <div class="field"><span class="label">Appearance</span><div class="row">${Object.entries(THEMES).map(([k, [ic]]) => `<button class="btn small ${k === curTheme() ? 'primary' : ''}" data-theme-set="${k}">${ic} ${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div></div>
       <div class="row">${installEvt && !standalone() ? '<button class="btn primary" id="lgInstall">⬇ Install app</button>' : ''}<span class="faint" style="font-size:12px">Version ${esc(LG.version)}</span></div>`;
+    el.querySelectorAll('[data-theme-set]').forEach((b) => (b.onclick = () => setTheme(b.dataset.themeSet)));
     el.querySelectorAll('[data-go]').forEach((b) => (b.onclick = () => { panelTab = b.dataset.go; draw(); }));
     const ib = $('#lgInstall', el); if (ib) ib.onclick = async () => { installEvt.prompt(); try { await installEvt.userChoice; } catch (e) {} installEvt = null; draw(); };
   }
