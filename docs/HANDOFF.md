@@ -41,5 +41,11 @@ gh secret list -R ArpithPaliwal/Learning-Galaxy
 gh run list -R ArpithPaliwal/Learning-Galaxy
 ```
 
-## In progress (2026-11-22): UI redesign "Deep space blue"
-User picked mockup C2 (black + faint stars, deep-blue hero), wants blue, light theme, phone/tablet/PC. Done: app/theme.css design layer (dark+light tokens, sidebar on desktop, bottom bar on phone, nebula "Up next" card), CSS colours tokenized in index.html, theme toggle (top bar + App panel). Not yet: screenshot review in light+dark at 3 widths, fix JS inline dark colours that look wrong in light theme, deploy (Netlify MCP), Learn/Jarvis tab restructure was proposed but not built. Mockups: .superpowers/brainstorm/.
+## UI redesign "Deep space blue" (done and deployed 2026-11-22)
+User picked mockup C2 (black + faint stars, deep-blue hero), loves blue, wants a light theme, phone/tablet/PC.
+- `app/theme.css` is the design layer, loaded after index.html's own CSS. Dark + light tokens; `.now`, `.stage`, `.space` stay "night sky" in both themes.
+- index.html CSS colours were turned into tokens (`rgb(var(--c-acc) / a)` etc.); canvas JS colours were left alone.
+- Theme: `html[data-theme]` = light/dark, none = follow device. Set early by an inline head script from localStorage `lg.app.theme`; toggle in the top bar and ⚡ App → Overview.
+- Layout: ≥1101px left sidebar; tablet top bar; phone bottom tabs. On phone `.top` must not have backdrop-filter (it traps the fixed tab bar).
+- Reviewed with headless-Edge screenshots, both themes, 1440/820/500px, real data (seed via a temporary dist/seed.js, then deleted).
+- Not done: Today·Learn·Jarvis·Radar·Library tab restructure (proposed only); inner screens (Skill Map, Radar, Courses, Library, Labs) re-skinned but not individually reviewed in the light theme. Mockups: `.superpowers/brainstorm/` (gitignored).
