@@ -70,3 +70,11 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - Claude subscription can NOT power in-app chat (only Claude Code in GitHub Actions for feature builds). Offered: publish as a claude.ai artifact so Jarvis runs on the user's Claude account; not done yet.
 - "Request a feature" (✨ button / sidebar) matches Expenses: Builder Claude/Copilot/Save only, Model Sonnet/Opus/Haiku, When Ship now/Within 6h. No live end-to-end build test yet.
 - Skill Map = 3D holo-table; canvases are theme-aware (kit() in lg-visuals.js).
+
+## Verification pass (2026-11-22)
+- Install: live manifest (standalone, 192/512/maskable icons) + service worker served; SW registers on the live site.
+- Sync: `tests/sync.test.mjs` (two devices through a fake Supabase). Fixed: run() now awaits in-flight/queued passes; tie-break matches the server trigger (incoming wins unless local change is unsent). Live DB: table exists, anon sees nothing (RLS), email sign-in on. A live two-device test with a temp user was blocked by auto-mode (needs the user's OK) — the user's own sign-in is the real test.
+- Cloud job no longer needs LG_USER_ID (db.mjs finds the single user).
+- Netlify "Powered by Netlify" badge hidden: `<div id="nl-hud-frame" hidden>` + `#nl-badge-frame` make Netlify's injected HUD script skip itself (it checks these ids). Confirmed no badge iframe live.
+- Feature pipeline test: issue #1 "Daily quote under the greeting on Today" filed to exercise build → test → merge.
+- Netlify repo still NOT linked → merged features need a manual deploy (Netlify MCP) until the user links it.
