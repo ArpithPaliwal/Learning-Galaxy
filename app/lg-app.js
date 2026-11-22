@@ -43,6 +43,10 @@
     b.innerHTML = '<i class="lg-dot" id="lgDot"></i><span class="t">⚡ App</span>';
     b.onclick = () => openPanel();
     right.insertBefore(b, right.firstChild);
+    const f = document.createElement('button');
+    f.id = 'lgFeatBtn'; f.className = 'iconbtn'; f.textContent = '✨'; f.title = 'Request a feature: Claude builds and ships it'; f.setAttribute('aria-label', 'Request a feature');
+    f.onclick = () => openPanel('build');
+    right.insertBefore(f, b.nextSibling);
     const t = document.createElement('button');
     t.id = 'lgThemeBtn'; t.className = 'iconbtn'; t.onclick = () => setTheme(nextTheme());
     right.insertBefore(t, b.nextSibling);
@@ -82,7 +86,7 @@
     document.body.appendChild(wrap); draw();
   }
   function closePanel() { if (wrap) wrap.remove(); panelTab = null; }
-  const TABS = [['home', 'Overview'], ['ai', 'AI brain'], ['sync', 'Cloud sync'], ['build', 'Builder'], ['data', 'Data']];
+  const TABS = [['home', 'Overview'], ['ai', 'AI brain'], ['sync', 'Cloud sync'], ['build', 'Request a feature'], ['data', 'Data']];
 
   function draw() {
     if (!wrap || !wrap.isConnected) return;
@@ -156,20 +160,29 @@
     q('#sbVer') && (q('#sbVer').onclick = async () => { try { await LG.Sync.verify(q('#sbE').value.trim(), q('#sbC').value); toast('Signed in. Syncing…'); draw(); } catch (e) { toast(e.message); } });
   }
 
+  // feature-request choices, same as the Expenses app (remembered on this device)
+  const fr = () => Object.assign({ builder: 'claude', model: 'sonnet', when: 'now' }, LG.cfg.get('fr', {}) || {});
+  const FR_HINT = { claude: 'Claude Code builds it, the checks run, and it ships to this app by itself.', copilot: 'Saved as an issue for GitHub Copilot. Assign it to Copilot on GitHub to build it.', manual: 'Saved as an idea on GitHub. Comment @claude on it any time to have Claude build it.' };
+  const pills = (label, key, opts) => `<div class="field"><span class="label">${label}</span><div class="row" style="gap:6px">${opts.map(([v, l]) => `<button class="btn small ${fr()[key] === v ? 'primary' : ''}" data-fr="${key}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
+
   function build(el) {
     el.innerHTML = `<p class="lg-note">Ask for any feature (here or just tell Jarvis). It becomes a GitHub issue; a GitHub Action runs <b>Claude Code</b> on it, checks it, and ships it to this app automatically, usually in 10–20 minutes. Reopen the app to get the new version.</p>
       <div class="field"><span class="label">What should Claude build?</span><input class="inp" id="frT" placeholder="e.g. Flashcard streak calendar on Today"><textarea class="inp" id="frD" rows="3" placeholder="Details: where it goes, how it should look and behave"></textarea></div>
-      <div class="row"><select class="inp" id="frM" style="width:auto"><option value="sonnet">Sonnet (fast)</option><option value="opus">Opus (smartest)</option></select><button class="btn primary" id="frGo">🔨 Build it</button></div>
+      ${pills('Builder', 'builder', [['claude', 'Claude'], ['copilot', 'Copilot'], ['manual', 'Save only']])}
+      <div id="frClaude" ${fr().builder === 'claude' ? '' : 'hidden'}>${pills('Model', 'model', [['sonnet', 'Sonnet'], ['opus', 'Opus'], ['haiku', 'Haiku']])}${pills('When?', 'when', [['now', 'Ship now'], ['scheduled', 'Within 6h']])}</div>
+      <p class="lg-note" id="frHint">${esc(FR_HINT[fr().builder])}</p>
+      <div class="row"><button class="btn primary" id="frGo">✨ Request it</button></div>
       <div class="label" style="margin-top:4px">Recent builds</div><div class="lg-builds" id="frList"><div class="faint" style="font-size:13px">Loading…</div></div>
       <details ${LG.GH.hasToken() ? '' : 'open'}><summary class="label" style="cursor:pointer">GitHub token ${LG.GH.hasToken() ? '(saved)' : '(optional)'}</summary>
-        <div class="lg-sec" style="margin-top:10px"><p class="lg-note">Without a token, “Build it” opens a prefilled GitHub issue for you to submit. With a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> (repo <code>${esc(LG.GH.repo())}</code> only · Issues: read/write · Actions: read/write) Jarvis can file builds and start cloud jobs by itself.</p>
+        <div class="lg-sec" style="margin-top:10px"><p class="lg-note">Without a token, “Request it” opens a prefilled GitHub issue for you to submit. With a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> (repo <code>${esc(LG.GH.repo())}</code> only · Issues: read/write · Actions: read/write) Jarvis can file builds and start cloud jobs by itself.</p>
         <div class="row"><input class="inp" id="ghT" type="password" style="flex:1 1 220px" placeholder="github_pat_…"><button class="btn small" id="ghS">Save</button>${LG.GH.hasToken() ? '<button class="btn small ghost" id="ghX">Remove</button>' : ''}</div></div></details>
       <div class="label">Cloud jobs</div><div class="row"><button class="btn small" id="jobD">Run daily job now</button><button class="btn small" id="jobC">Find course videos now</button></div>`;
     const q = (s) => $(s, el);
     q('#frGo').onclick = async () => {
       const t = q('#frT').value.trim(); if (!t) { toast('Write what to build first.'); return; }
-      try { const r = await LG.GH.requestFeature(t, q('#frD').value, { model: q('#frM').value, source: 'App panel' }); toast(r.number ? 'Sent as #' + r.number + '. Claude is on it.' : 'Submit the GitHub issue that just opened.'); q('#frT').value = ''; q('#frD').value = ''; loadBuilds(q('#frList')); } catch (e) { toast(e.message); }
+      try { const r = await LG.GH.requestFeature(t, q('#frD').value, Object.assign({ source: 'App panel' }, fr())); toast(r.number ? 'Sent as #' + r.number + '. Claude is on it.' : 'Submit the GitHub issue that just opened.'); q('#frT').value = ''; q('#frD').value = ''; loadBuilds(q('#frList')); } catch (e) { toast(e.message); }
     };
+    el.querySelectorAll('[data-fr]').forEach((b) => (b.onclick = () => { LG.cfg.set('fr', Object.assign(fr(), { [b.dataset.fr]: b.dataset.v })); draw(); }));
     q('#ghS').onclick = () => { LG.GH.setToken(q('#ghT').value); toast('GitHub token saved on this device.'); draw(); };
     q('#ghX') && (q('#ghX').onclick = () => { LG.GH.setToken(''); draw(); });
     q('#jobD').onclick = async () => { try { toast((await LG.GH.runJob('daily')) ? 'Daily job started. Results sync in a few minutes.' : 'Opened GitHub Actions: press “Run workflow”.'); } catch (e) { toast(e.message); } };

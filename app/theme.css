@@ -250,6 +250,7 @@ details.acc{border-radius:var(--r-md);background:var(--panel);overflow:hidden}
 @media (min-width:1101px){
   .top .right .iconbtn{gap:10px;padding:0 14px;font:600 14px var(--f-body);color:var(--fg-2);display:flex;align-items:center}
   #lgThemeBtn::after{content:"Appearance"}
+  #lgFeatBtn::after{content:"Request a feature"}
   #cmdBtn::after{content:"Search & commands"}
   #settingsBtn::after{content:"Settings"}
   .top .right .clock{font-size:12.5px}

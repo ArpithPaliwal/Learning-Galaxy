@@ -112,3 +112,11 @@ test('mcp fire_trigger maps to the GitHub cloud job', async () => {
   assert.match(call.u, /actions\/workflows\/cloud-job\.yml\/dispatches$/);
   assert.equal(call.body.inputs.kind, 'courses');
 });
+
+test('feature request footer matches the Expenses app (builder, model, when)', async () => {
+  const { win, opened } = boot();
+  await win.LG.requestFeature('Dark map', 'x', { builder: 'claude', model: 'haiku', when: 'scheduled' });
+  assert.match(decodeURIComponent(opened[0]), /Builder: Claude · Model: Haiku · When: Next scheduled run/);
+  await win.LG.requestFeature('Idea', 'y', { builder: 'manual' });
+  assert.match(decodeURIComponent(opened[1]), /Builder: Just save it\n/);
+});

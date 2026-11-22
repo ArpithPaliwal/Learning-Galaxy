@@ -208,8 +208,13 @@
       if (!res.ok) { const t = await res.text(); throw err('github', res.status === 401 ? 'GitHub rejected the token. Make a new one in ⚡ App → Builder.' : res.status === 404 && tok() ? 'GitHub token cannot see ' + repo() + '. Give it access to that repo.' : 'GitHub error ' + res.status + ': ' + t.slice(0, 160)); }
       return res.status === 204 ? null : res.json();
     }
+    // Same footer as the Expenses app, so the shared workflow reads it the same way.
+    const BUILDER = { claude: 'Claude', copilot: 'GitHub Copilot', manual: 'Just save it' };
+    const MODEL = { sonnet: 'Sonnet', opus: 'Opus', haiku: 'Haiku' };
     function issueBody(details, o) {
-      return [String(details || '').trim() || '(no extra details)', '', '---', 'Builder: Claude · Model: ' + (o.model === 'opus' ? 'Opus' : 'Sonnet') + ' · When: Now', 'Requested via: ' + (o.source || 'App'), 'Sent from the app'].join('\n');
+      const b = BUILDER[o.builder] ? o.builder : 'claude', m = MODEL[o.model] ? o.model : 'sonnet', w = o.when === 'scheduled' ? 'Next scheduled run' : 'Ship now';
+      const line = 'Builder: ' + BUILDER[b] + (b === 'claude' ? ' · Model: ' + MODEL[m] + ' · When: ' + w : '');
+      return [String(details || '').trim() || '(no extra details)', '', '---', line, 'Requested via: ' + (o.source || 'App'), 'Sent from the app'].join('\n');
     }
     async function requestFeature(title, details, o = {}) {
       title = String(title || '').trim().slice(0, 90); if (!title) throw err('empty', 'Give the feature a name.');
