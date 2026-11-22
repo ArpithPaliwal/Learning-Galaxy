@@ -153,8 +153,10 @@
     if (LG.ARTIFACT) return artifactAi(el);
     const c = LG.cfg.get('ai', {}) || {}; const cur = LG.aiCfg(); const P = LG.PROVIDERS[cur.provider]; const adv = Object.assign({}, P.adv || {}, c.adv || {});
     const opts = Object.entries(LG.GROUPS).map(([g, gl]) => `<optgroup label="${esc(gl)}">${Object.entries(LG.PROVIDERS).filter(([, p]) => p.group === g).map(([k, p]) => `<option value="${k}" ${k === cur.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</optgroup>`).join('');
+    const saved = LG.savedAi();
     const showBase = cur.provider === 'custom' || cur.provider === 'azure' || P.group === 'local' || !!c.base;
     el.innerHTML = `<p class="lg-note">Jarvis, course drafting, quizzes and teach-back use this. Works with any provider: paste a key and it is recognised automatically. The key stays on this device and goes only to that provider.</p>
+      ${saved.length ? `<div class="field"><span class="label">Saved on this device</span><div class="lg-builds">${saved.map((x) => `<div class="lg-build"><div><b style="font-size:14px">${x.active ? '✓ ' : ''}${esc(x.label)}</b><div class="faint" style="font-size:12.5px">${x.key ? esc(x.key.slice(0, 4)) + '…' + esc(x.key.slice(-4)) + ' · ' : 'no key needed · '}${esc(x.model)}</div></div><div class="row" style="gap:6px;flex-wrap:nowrap">${x.active ? '' : `<button class="btn small" data-use="${x.id}">Use</button>`}<button class="btn small ghost" data-forget="${x.id}" title="Forget this key">✕</button></div></div>`).join('')}</div></div>` : ''}
       <div class="field"><span class="label">Provider</span><select class="inp" id="aiP">${opts}</select><span class="faint" style="font-size:12.5px">${esc(P.note || '')}${P.keyUrl ? ` · <a href="${P.keyUrl}" target="_blank" rel="noopener">Get a key ↗</a>` : ''}</span></div>
       ${P.noKey ? '' : `<div class="field"><span class="label">API key</span>
         <div class="row" style="flex-wrap:nowrap"><input class="inp lg-key" id="aiK" type="text" name="lg-api-key-${cur.provider}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" placeholder="Paste your ${esc(P.label)} key" value="${esc(c.key || '')}" style="flex:1;min-width:0">
@@ -172,16 +174,20 @@
           <div class="field"><span class="label">Extra headers (one per line)</span><textarea class="inp" id="aiH" rows="2" placeholder="X-Title: Learning Galaxy">${esc(adv.headers || '')}</textarea></div>` : ''}
         ${(LG.cfg.get('ai.proxy', {}) || {})[cur.provider] ? `<div class="row"><span class="faint" style="font-size:12.5px">Using the app's relay for ${esc(P.label)} (direct calls were blocked).</span><button class="btn small ghost" id="aiNp">Try direct again</button></div>` : ''}
       </div></details>
+      <label class="row" style="gap:10px;font-size:13.5px;align-items:flex-start;flex-wrap:nowrap;cursor:pointer"><input type="checkbox" class="check" id="aiSync" ${LG.aiSyncOn() ? 'checked' : ''}> <span>Keep these AI settings on all my devices<br><span class="faint" style="font-size:12.5px">Stores your keys and model names in your private database (only you can read them). Turn it off and they are removed from the database again. Never included in backups.</span></span></label>
       <div class="row"><button class="btn primary" id="aiSave">Save</button><button class="btn" id="aiTest">Test</button><span class="faint" id="aiOut" style="font-size:13px"></span></div>`;
     const v = (id) => { const n = $(id, el); return n ? n.value.trim() : undefined; };
     const read = () => {
-      const key0 = String(v('#aiK') ?? c.key ?? '').replace(/^Bearers+/i, ''); const p0 = $('#aiP', el).value; const d0 = LG.detectProvider(key0);
+      const key0 = String(v('#aiK') ?? c.key ?? '').replace(/^Bearer\s+/i, ''); const p0 = $('#aiP', el).value; const d0 = LG.detectProvider(key0);
       const auto = d0 && d0 !== 'openai' && d0 !== p0 && p0 !== 'custom' && LG.PROVIDERS[p0].group !== 'local';
       const o = { provider: auto ? d0 : p0, key: key0, base: v('#aiB') || '', default: v('#aiM'), complex: v('#aiC'), quick: v('#aiQ') };
       if ($('#aiPr', el)) o.adv = { protocol: v('#aiPr'), auth: v('#aiAu'), authName: v('#aiAn'), path: v('#aiPa'), query: v('#aiQs'), headers: $('#aiH', el).value };
       return o;
     };
-    $('#aiP', el).onchange = () => { LG.cfg.set('ai', Object.assign(read(), { base: '', default: '', complex: '', quick: '', adv: undefined })); draw(); };
+    $('#aiP', el).onchange = () => { LG.saveAi(Object.assign(read(), { provider: cur.provider })); LG.switchAi($('#aiP', el).value); draw(); };
+    el.querySelectorAll('[data-use]').forEach((b) => (b.onclick = () => { LG.saveAi(Object.assign(read(), { provider: cur.provider })); LG.switchAi(b.dataset.use); draw(); toast('Using ' + LG.PROVIDERS[b.dataset.use].label + '.'); }));
+    el.querySelectorAll('[data-forget]').forEach((b) => (b.onclick = () => { LG.forgetAi(b.dataset.forget); draw(); toast('Forgot the saved ' + LG.PROVIDERS[b.dataset.forget].label + ' setup.'); }));
+    $('#aiSync', el).onchange = async (e) => { await LG.setAiSync(e.target.checked); toast(e.target.checked ? 'AI settings now follow you across devices.' : 'AI settings removed from your database. They stay on this device.'); };
     const k = $('#aiK', el);
     // what is actually in the box: a short fingerprint + sanity checks (so a stray autofill or a doubled paste is visible)
     const KEYLEN = { groq: 56 };
@@ -200,12 +206,12 @@
       $('#aiClr', el).onclick = () => { k.value = ''; fp(); k.focus(); };
     }
     if (k) k.oninput = () => { const d = LG.detectProvider(k.value); const out = $('#aiDet', el);
-      if (d && d !== $('#aiP', el).value) { out.innerHTML = `Looks like a <b>${esc(LG.PROVIDERS[d].label)}</b> key. <a href="#" id="aiSw">Switch</a>`; $('#aiSw', el).onclick = (e) => { e.preventDefault(); LG.cfg.set('ai', { provider: d, key: k.value.trim() }); draw(); toast('Switched to ' + LG.PROVIDERS[d].label + '.'); }; }
+      if (d && d !== $('#aiP', el).value) { out.innerHTML = `Looks like a <b>${esc(LG.PROVIDERS[d].label)}</b> key. <a href="#" id="aiSw">Switch</a>`; $('#aiSw', el).onclick = (e) => { e.preventDefault(); LG.saveAi(Object.assign(read(), { provider: cur.provider, key: (c.key || '') })); LG.saveAi({ provider: d, key: k.value.trim() }); draw(); toast('Switched to ' + LG.PROVIDERS[d].label + '.'); }; }
       else out.textContent = ''; };
     $('#aiNp', el) && ($('#aiNp', el).onclick = () => { const p = Object.assign({}, LG.cfg.get('ai.proxy', {}) || {}); delete p[cur.provider]; LG.cfg.set('ai.proxy', p); draw(); });
-    $('#aiSave', el).onclick = () => { const o = read(); LG.cfg.set('ai', o); toast(o.provider !== $('#aiP', el).value ? 'Saved. That is a ' + LG.PROVIDERS[o.provider].label + ' key, so I switched to ' + LG.PROVIDERS[o.provider].label + '.' : 'AI settings saved.'); draw(); };
+    $('#aiSave', el).onclick = () => { const o = read(); LG.saveAi(o); toast(o.provider !== $('#aiP', el).value ? 'Saved. That is a ' + LG.PROVIDERS[o.provider].label + ' key, so I switched to ' + LG.PROVIDERS[o.provider].label + '.' : 'AI settings saved.'); draw(); };
     $('#aiTest', el).onclick = async () => {
-      const rd = read(); LG.cfg.set('ai', rd); if (rd.provider !== $('#aiP', el).value) { draw(); toast('That is a ' + LG.PROVIDERS[rd.provider].label + ' key, so I switched to it. Testing…'); setTimeout(() => { const t = document.getElementById('aiTest'); t && t.click(); }, 300); return; } const o = $('#aiOut', el); o.textContent = 'Testing…';
+      const rd = read(); LG.saveAi(rd); if (rd.provider !== $('#aiP', el).value) { draw(); toast('That is a ' + LG.PROVIDERS[rd.provider].label + ' key, so I switched to it. Testing…'); setTimeout(() => { const t = document.getElementById('aiTest'); t && t.click(); }, 300); return; } const o = $('#aiOut', el); o.textContent = 'Testing…';
       try { const r = await LG.sample('Reply with exactly: Online.', { modelTier: 'default', maxTokens: 20 }); o.textContent = '✓ ' + r.text.trim().slice(0, 50) + (r.route === 'proxy' ? ' (via relay)' : ''); }
       catch (e) { o.textContent = '✕ ' + (e.text || e.message); }
     };
@@ -294,7 +300,7 @@
     el.innerHTML = `<p class="lg-note">${LG.store.count()} records on this device${counts.length ? ': ' + counts.slice(0, 8).map(([k, n]) => esc(k) + ' ' + n).join(' · ') : ''}.</p>
       <div class="row"><label class="btn primary" style="cursor:pointer">⬆ Import a backup<input type="file" id="dImp" accept="application/json,.json" hidden></label><button class="btn" id="dExp">⬇ Download a backup</button></div>
       <p class="lg-note">Import merges a backup file (from this app or the old claude.ai version) into your data. Records with the same id are replaced.</p>`;
-    $('#dExp', el).onclick = () => window.claude.use('downloads').then((d) => d.save({ filename: 'learning-galaxy-' + new Date().toISOString().slice(0, 10) + '.json', data: JSON.stringify(LG.store.exportAll()) }));
+    $('#dExp', el).onclick = () => { const all = LG.store.exportAll(); if (all.meta) delete all.meta.aisettings; return window.claude.use('downloads').then((d) => d.save({ filename: 'learning-galaxy-' + new Date().toISOString().slice(0, 10) + '.json', data: JSON.stringify(all) })); };
     $('#dImp', el).onchange = async (e) => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
       let obj; try { obj = JSON.parse(await f.text()); } catch (er) { toast('That file is not a Learning Galaxy backup.'); return; }

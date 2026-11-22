@@ -1313,7 +1313,7 @@ $('#settingsBtn').onclick = () => { const p = profile(); const m = C('meta').get
     $('#sMic').onclick = () => openMicTest();
     $('#sAudit').onclick = () => openAudit();
     $('#sRun').onclick = async () => { const ok = await fireBot('daily'); toast(ok ? 'Started. Results appear in a few minutes.' : 'Could not start it. Add a GitHub token in ⚡ App → Builder.'); };
-    $('#sBackup') && ($('#sBackup').onclick = async () => { const out = {}; for (const c of COLS) out[c] = Object.fromEntries([...C(c)].map(([k, v]) => [k, v])); try { await S.downloads.save({filename:`learning-galaxy-${today()}.json`, data: JSON.stringify(out, null, 1)}); } catch(e){} });
+    $('#sBackup') && ($('#sBackup').onclick = async () => { const out = {}; for (const c of COLS) out[c] = Object.fromEntries([...C(c)].map(([k, v]) => [k, v])); if (out.meta) delete out.meta.aisettings; /* holds AI keys: never in a backup */ try { await S.downloads.save({filename:`learning-galaxy-${today()}.json`, data: JSON.stringify(out, null, 1)}); } catch(e){} });
   }); };
 
 /* ============ VOICE ============ */

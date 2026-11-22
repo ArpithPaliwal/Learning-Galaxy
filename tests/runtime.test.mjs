@@ -193,3 +193,31 @@ test('a course request goes to GitHub as a "Course:" issue (API with a token, pr
   const r2 = await b.win.LG.GH.requestCourse('RAG basics', 'intermediate', 45);
   assert.equal(r2.link, true); assert.match(r2.url, /issues\/new\?title=Course%3A%20RAG%20basics/); assert.equal(b.opened.length, 1);
 });
+
+test('every provider keeps its own key, models and endpoint; switching restores them', async () => {
+  const { win } = boot(); const LG = win.LG;
+  LG.saveAi({ provider: 'groq', key: 'gsk_aaaa', default: 'llama-x' });
+  LG.switchAi('gemini'); assert.equal(LG.aiCfg().provider, 'gemini'); assert.equal(LG.aiCfg().key, '', 'groq key must not leak into gemini');
+  LG.saveAi({ provider: 'gemini', key: 'AIzaBBBB', quick: 'flash-lite' });
+  LG.switchAi('groq'); assert.equal(LG.aiCfg().key, 'gsk_aaaa'); assert.equal(LG.aiCfg().models.default, 'llama-x');
+  LG.switchAi('gemini'); assert.equal(LG.aiCfg().key, 'AIzaBBBB'); assert.equal(LG.aiCfg().models.quick, 'flash-lite');
+  assert.deepEqual(JSON.parse(JSON.stringify(LG.savedAi())).map((x) => [x.id, x.active]).sort(), [['gemini', true], ['groq', false]]);
+  LG.forgetAi('groq'); assert.deepEqual(LG.savedAi().map((x) => x.id), ['gemini']);
+});
+
+test('AI settings sync across devices only when switched on, and the cloud copy is removed when switched off', async () => {
+  const { win } = boot(); const LG = win.LG; await LG.store.ready;
+  LG.saveAi({ provider: 'groq', key: 'gsk_zzzz' }); await new Promise((r) => setTimeout(r, 600));
+  assert.equal(LG.store.get('meta/aisettings'), undefined, 'off by default: nothing leaves the device');
+  await LG.setAiSync(true); await new Promise((r) => setTimeout(r, 600));
+  assert.equal(LG.store.get('meta/aisettings').profiles.groq.key, 'gsk_zzzz');
+  await LG.setAiSync(false); await new Promise((r) => setTimeout(r, 50));
+  assert.equal(LG.store.get('meta/aisettings'), undefined);
+});
+
+test('a newer synced copy replaces an older local one', async () => {
+  const { win } = boot(); const LG = win.LG; await LG.store.ready;
+  LG.saveAi({ provider: 'groq', key: 'gsk_old' }); await LG.setAiSync(true);
+  await LG.store.db.doc('meta/aisettings').set({ provider: 'openai', profiles: { openai: { key: 'sk-new', default: 'gpt-x' } }, at: Date.now() + 5000 });
+  await LG.pullAi(); assert.equal(LG.aiCfg().provider, 'openai'); assert.equal(LG.aiCfg().key, 'sk-new');
+});

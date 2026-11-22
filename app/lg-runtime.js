@@ -81,7 +81,7 @@
     };
   }
   const store = ARTIFACT ? artifactStore() : window.LGStore.createStore({ name: 'learning-galaxy' });
-  store.onChange(() => { emit('data'); Sync.soon(); });
+  store.onChange((cols) => { emit('data'); Sync.soon(); if (!cols || cols.has('meta')) pullAi(); });
 
   /* ---------- AI: any provider (same list as the Expenses app) ---------- */
   // protocol: openai (chat/completions, used by most), anthropic (messages), gemini (generateContent).
@@ -130,6 +130,61 @@
     return { provider: id, label: P.label, protocol, key, noKey: !!P.noKey, base: (mine('base') || P.base || '').replace(/\/+$/, ''), adv,
       models: { quick: mine('quick') || P.models.quick || def, default: def, complex: mine('complex') || P.models.complex || def } };
   }
+  /* ---- remembered AI setups: every provider keeps its own key, models and endpoint ---- */
+  // `ai` in storage = the active setup (provider + its fields) plus `profiles` = {provider: fields} for every
+  // provider ever used on this device, so switching providers never loses a key or a model name.
+  // Optional (off by default): `ai.sync` keeps the same data in your private database as meta/aisettings so
+  // all your devices share it. It is removed from the database again when you turn the option off, and it is
+  // never included in backups.
+  const AI_FIELDS = ['key', 'base', 'default', 'complex', 'quick', 'adv'];
+  const aiRaw = () => cfg.get('ai', {}) || {};
+  const profileOf = (o) => { const p = {}; for (const k of AI_FIELDS) { const v = o && o[k]; if (v == null || v === '') continue; if (k === 'adv' && !Object.values(v).some((x) => x)) continue; p[k] = v; } return p; };
+  const aiSyncOn = () => !ARTIFACT && !!cfg.get('ai.sync', false);
+  let aiPushT = null;
+  function pushAi() {
+    if (!aiSyncOn()) return; clearTimeout(aiPushT);
+    aiPushT = setTimeout(async () => { try { await store.ready; const c = aiRaw(); await store.db.doc('meta/aisettings').set({ provider: c.provider || '', profiles: c.profiles || {}, at: c.at || Date.now() }); } catch (e) {} }, 400);
+  }
+  async function pullAi() {
+    if (!aiSyncOn()) return;
+    try {
+      await store.ready; const d = await store.db.doc('meta/aisettings').get();
+      if (!d.exists) { pushAi(); return; }
+      const r = d.data() || {}, c = aiRaw();
+      if ((r.at || 0) > (c.at || 0) && r.profiles) { const prov = PROVIDERS[r.provider] ? r.provider : c.provider; cfg.set('ai', Object.assign({ provider: prov }, (r.profiles || {})[prov] || {}, { profiles: r.profiles, at: r.at })); emit('ai'); }
+    } catch (e) {}
+  }
+  /** Save the active setup and remember it under its provider. */
+  function saveAi(o) {
+    const cur = aiRaw(), prov = o.provider || cur.provider || 'anthropic', prof = profileOf(o);
+    const profiles = Object.assign({}, cur.profiles || {}); if (Object.keys(prof).length) profiles[prov] = prof; else delete profiles[prov];
+    cfg.set('ai', Object.assign({ provider: prov }, prof, { profiles, at: Date.now() })); pushAi();
+  }
+  /** Make another provider active, restoring whatever was saved for it before. */
+  function switchAi(provider) {
+    const cur = aiRaw(), profiles = Object.assign({}, cur.profiles || {}), here = profileOf(cur);
+    if (cur.provider && Object.keys(here).length) profiles[cur.provider] = here;
+    cfg.set('ai', Object.assign({ provider }, profiles[provider] || {}, { profiles, at: Date.now() })); pushAi();
+  }
+  function forgetAi(provider) {
+    const cur = aiRaw(), profiles = Object.assign({}, cur.profiles || {}); delete profiles[provider];
+    const active = cur.provider === provider ? { provider } : Object.assign({ provider: cur.provider }, profileOf(cur));
+    cfg.set('ai', Object.assign(active, { profiles, at: Date.now() })); pushAi();
+  }
+  /** Providers that have a saved key (or a keyless local setup), for the "Saved" list. */
+  function savedAi() {
+    const cur = aiRaw(), act = aiCfg(), profiles = Object.assign({}, cur.profiles || {}), here = profileOf(cur);
+    if (cur.provider && Object.keys(here).length) profiles[cur.provider] = here;
+    return Object.entries(profiles).filter(([id, p]) => PROVIDERS[id] && (p.key || PROVIDERS[id].noKey) && Object.keys(p).length)
+      .map(([id, p]) => ({ id, label: PROVIDERS[id].label, key: p.key || '', model: p.default || PROVIDERS[id].models.default || '', active: id === act.provider }));
+  }
+  async function setAiSync(on) {
+    cfg.set('ai.sync', !!on);
+    if (on) { const c = aiRaw(); cfg.set('ai', Object.assign({}, c, { at: Date.now() })); pushAi(); }
+    else { try { await store.ready; await store.db.doc('meta/aisettings').delete(); } catch (e) {} }
+  }
+  // ask the browser not to evict this app's saved settings under storage pressure
+  try { if (!ARTIFACT && navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   const fileToB64 = (f) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(f); });
   function normMsgs(input) {
     let msgs = typeof input === 'string' ? [{ role: 'user', content: input }] : (Array.isArray(input) ? input : [input]).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: typeof m.content === 'string' ? m.content : (m.content == null ? '' : m.content) }));
@@ -448,7 +503,8 @@
   }
   loadFeed(); setInterval(loadFeed, 3 * 3600e3);
 
-  window.LG = Object.assign(window.LG || {}, { ARTIFACT, NATIVE, cfg, bus, store, loadFeed, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
+  window.LG = Object.assign(window.LG || {}, { ARTIFACT, NATIVE, cfg, bus, store, loadFeed, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, saveAi, switchAi, forgetAi, savedAi, setAiSync, pullAi, aiSyncOn, setAi: (o) => saveAi(Object.assign({}, aiRaw(), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
 
+  store.ready.then(() => pullAi());
   Sync.handleRedirect().finally(() => Sync.soon(400));
 })();
