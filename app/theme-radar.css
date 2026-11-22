@@ -51,10 +51,10 @@ html:not([data-theme="light"]) .jarvis{background:linear-gradient(180deg,rgb(11 
 html:not([data-theme="light"]) .msg.assistant{background:rgb(4 19 38 / .85);border:1px solid rgb(94 200 255 / .16)}
 html:not([data-theme="light"]) .msg.user{background:linear-gradient(135deg,#2D8FE0,#1b62b0);color:#fff}
 html:not([data-theme="light"]) .composer{background:rgb(2 10 24 / .8);border-top-color:rgb(94 200 255 / .14)}
-.j-core{position:relative;height:200px;flex:none;border-bottom:1px solid rgb(94 200 255 / .12);overflow:hidden}
+.j-core{position:relative;height:250px;flex:none;border-bottom:1px solid rgb(94 200 255 / .12);overflow:hidden}
 .j-core canvas{position:absolute;inset:0;width:100%;height:100%}
-.j-core .st{position:absolute;left:0;right:0;bottom:10px;text-align:center;font:500 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
-@media (max-height:720px){.j-core{height:150px}}
+.j-core .st{position:absolute;left:0;right:0;bottom:6px;text-align:center;font:500 11px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+@media (max-height:760px){.j-core{height:190px}}
 .j-head .rx{display:none}
 
 @media (prefers-reduced-motion:reduce){body::after,.now::after,.rx::after{animation:none!important}}

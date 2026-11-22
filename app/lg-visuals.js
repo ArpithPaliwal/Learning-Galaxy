@@ -49,119 +49,149 @@
   }
 
   /* =====================================================================
-   * SKILL CHART (Skill Map tab): your topics on a radar-style star chart
-   * sectors = subjects, rings = stage (mastered at the centre → suggestions at the rim)
+   * SKILL HOLO-TABLE (Skill Map tab): a tilted 3D sonar disc; each topic is a glowing pin.
+   * sectors = subjects, distance from centre = stage, pin height = how far along you are.
+   * Drag to turn it, tap a pin to open the topic.
    * ===================================================================== */
-  const BANDS = [['learned', 'Mastered', 0.1, 0.3], ['learning', 'Learning', 0.3, 0.5], ['todo', 'Bucket', 0.5, 0.76], ['suggested', 'Suggested', 0.76, 0.96]];
+  const BANDS = [['learned', 'Mastered', 0.12, 0.32, 1], ['learning', 'Learning', 0.32, 0.52, 0.7], ['todo', 'Bucket', 0.52, 0.76, 0.32], ['suggested', 'Suggested', 0.76, 0.96, 0.06]];
   function mountGalaxy() {
     const view = document.getElementById('v-galaxy'); if (!view || view.querySelector('.lgv-gx')) return;
     const el = document.createElement('div'); el.className = 'lgv lgv-gx space';
-    el.innerHTML = '<canvas aria-label="Skill chart: your topics by subject and stage. Tap a dot to open the topic."></canvas><div class="lgv-hd"><h3>Skill chart</h3><p id="gxHint"></p></div><a class="lgv-lock" id="gxLock" hidden></a><div class="lgv-tip"></div><div class="lgv-key" id="gxKey"></div>';
+    el.innerHTML = '<canvas aria-label="Skill holo-table: your topics as pins by subject and stage. Drag to turn, tap a pin to open it."></canvas><div class="lgv-hd"><h3>Skill map</h3><p id="gxHint"></p></div><a class="lgv-lock" id="gxLock" hidden></a><div class="lgv-tip"></div><div class="lgv-key" id="gxKey"></div>';
     view.insertBefore(el, view.firstChild);
     const tip = el.querySelector('.lgv-tip'), lock = el.querySelector('#gxLock');
-    let dots = [], cats = [], beam = 0, mouse = { x: -1, y: -1 }, hover = null;
+    let pins = [], cats = [], beam = 0, yaw = -0.5, tilt = 1.02, drag = null, moved = 0, mouse = { x: -1, y: -1 }, hover = null, auto = 1;
     function rebuild() {
       cats = [...data.categories.values()].sort((a, b) => (a.order ?? 99) - (b.order ?? 99)); if (!cats.length) cats = [{ id: 'all', name: 'Topics' }];
       const ci = new Map(cats.map((c, i) => [c.id, i])); const n = cats.length;
-      dots = [...data.topics.values()].filter((t) => !t.hidden).map((t) => {
-        const band = BANDS.find((b) => b[0] === t.status) || BANDS[2]; const i = ci.has(t.cat) ? ci.get(t.cat) : 0;
-        const h = hash(t.id), h2 = hash(t.id + '#');
+      pins = [...data.topics.values()].filter((t) => !t.hidden).map((t) => {
+        const band = BANDS.find((b) => b[0] === t.status) || BANDS[2]; const i = ci.has(t.cat) ? ci.get(t.cat) : 0; const h = hash(t.id), h2 = hash(t.id + '#');
         return { id: t.id, name: t.title || 'Untitled', st: band[0], stage: band[1], cat: cats[i].name, col: PAL[i % PAL.length],
-          ang: (i + 0.08 + h * 0.84) / n * 6.283, rad: band[2] + (band[3] - band[2]) * (0.12 + h2 * 0.76), lit: 0 };
+          ang: (i + 0.08 + h * 0.84) / n * 6.283, rad: band[2] + (band[3] - band[2]) * (0.12 + h2 * 0.76), ht: band[4] * (0.75 + 0.25 * hash(t.id + '^')), lit: 0 };
       });
-      const c = (s) => dots.filter((d) => d.st === s).length;
-      el.querySelector('#gxHint').textContent = `${dots.length} topics · ${c('learned')} mastered · ${c('learning')} learning · tap a dot to open it`;
+      const c = (s) => pins.filter((d) => d.st === s).length;
+      el.querySelector('#gxHint').textContent = `${pins.length} topics · ${c('learned')} mastered · ${c('learning')} learning · drag to turn, tap a pin`;
       el.querySelector('#gxKey').innerHTML = cats.slice(0, 6).map((k, i) => `<span style="color:rgb(${PAL[i % PAL.length].join(',')})"><i style="background:rgb(${PAL[i % PAL.length].join(',')})"></i>${esc(k.name)}</span>`).join('');
-      const cur = dots.find((d) => d.st === 'learning');
+      const cur = pins.find((d) => d.st === 'learning');
       if (cur) { lock.hidden = false; lock.href = '#'; lock.innerHTML = `<small>LEARNING NOW · ${esc(cur.cat)}</small><b>${esc(cur.name)}</b>Tap to open`; lock.onclick = (e) => { e.preventDefault(); window.LGApp && window.LGApp.openTopic(cur.id); }; } else lock.hidden = true;
     }
     subs.push((c) => (c === 'topics' || c === 'categories') && rebuild());
     const cv = canvasLoop(el, draw);
-    cv.addEventListener('pointermove', (e) => { const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top }; });
+    cv.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw, tilt }; moved = 0; el.classList.add('drag'); cv.setPointerCapture(e.pointerId); auto = 0; });
+    cv.addEventListener('pointermove', (e) => { const r = cv.getBoundingClientRect(); mouse = { x: e.clientX - r.left, y: e.clientY - r.top }; if (!drag) return; moved += Math.abs(e.movementX) + Math.abs(e.movementY); yaw = drag.yaw + (e.clientX - drag.x) * 0.006; tilt = Math.max(0.35, Math.min(1.25, drag.tilt + (e.clientY - drag.y) * 0.004)); });
+    cv.addEventListener('pointerup', () => { const wasDrag = moved > 6; drag = null; el.classList.remove('drag'); setTimeout(() => (auto = 1), 4000); if (!wasDrag && hover && window.LGApp) window.LGApp.openTopic(hover.id); });
     cv.addEventListener('pointerleave', () => { mouse = { x: -1, y: -1 }; });
-    cv.addEventListener('click', () => { if (hover && window.LGApp) window.LGApp.openTopic(hover.id); });
     function draw(g, W, H, now, dt) {
-      const cx = W / 2, cy = H / 2 + 14, R = Math.min(W, H) * 0.42; beam = (beam + dt * 0.7) % 6.283;
-      g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
-      const bg = g.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.7); bg.addColorStop(0, '#0b2a4a'); bg.addColorStop(0.45, '#041326'); bg.addColorStop(1, '#01040c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
-      // stage rings + labels
-      g.font = '500 10px "JetBrains Mono", monospace';
-      for (const [, label, , outer] of BANDS) { g.strokeStyle = 'rgba(94,200,255,.2)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, outer * R, 0, 7); g.stroke(); g.fillStyle = 'rgba(143,200,240,.55)'; g.fillText(label.toUpperCase(), cx + 6, cy - outer * R + 12); }
-      g.strokeStyle = 'rgba(94,200,255,.5)'; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
-      for (let i = 0; i < 120; i++) { const a = i / 120 * 6.283, L = i % 10 ? 3 : 8; g.strokeStyle = 'rgba(94,200,255,.4)'; g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + L), cy + Math.sin(a) * (R + L)); g.stroke(); }
-      // subject sectors + names at the rim
-      const n = cats.length;
-      for (let i = 0; i < n; i++) {
-        const a = i / n * 6.283 - Math.PI / 2; g.strokeStyle = 'rgba(94,200,255,.12)'; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.stroke();
-        const m = (i + 0.5) / n * 6.283 - Math.PI / 2; const lx = cx + Math.cos(m) * (R + 22), ly = cy + Math.sin(m) * (R + 22);
-        g.fillStyle = `rgba(${PAL[i % PAL.length].join(',')},.9)`; g.font = '600 12px Manrope, system-ui'; g.textAlign = Math.cos(m) > 0.2 ? 'left' : Math.cos(m) < -0.2 ? 'right' : 'center'; g.fillText(cats[i].name, lx, ly + 4); g.textAlign = 'left';
+      yaw += dt * 0.05 * auto; beam = (beam + dt * 0.8) % 6.283;
+      const cx = W / 2, cy = H * 0.56, R = Math.min(W * 0.36, H * 0.6), HT = R * 0.42;
+      const cY = Math.cos(yaw), sY = Math.sin(yaw), cT = Math.cos(tilt), sT = Math.sin(tilt);
+      const P = (r, a, z = 0) => { let x = Math.cos(a) * r, y = Math.sin(a) * r; [x, y] = [x * cY - y * sY, x * sY + y * cY]; const yy = y * cT, zz = y * sT; const k = 3.2 / (3.2 + zz / R * 0.9); return [cx + x * k, cy + yy * k - z * k, zz]; };
+      g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+      const bg = g.createRadialGradient(cx, cy - R * 0.3, 0, cx, cy, Math.max(W, H) * 0.8); bg.addColorStop(0, '#0b2a4a'); bg.addColorStop(0.45, '#041326'); bg.addColorStop(1, '#01040c'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
+      // disc glow
+      g.save(); g.translate(cx, cy); g.scale(1, Math.max(0.2, cT)); const dg = g.createRadialGradient(0, 0, 0, 0, 0, R * 1.05); dg.addColorStop(0, 'rgba(94,200,255,.16)'); dg.addColorStop(0.7, 'rgba(94,200,255,.05)'); dg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = dg; g.beginPath(); g.arc(0, 0, R * 1.05, 0, 7); g.fill(); g.restore();
+      const ring = (r, a, w = 1, dash) => { g.strokeStyle = `rgba(94,200,255,${a})`; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); for (let k = 0; k <= 96; k++) { const [x, y] = P(r * R, k / 96 * 6.283); k ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]); };
+      for (const [, label, , outer] of BANDS) ring(outer, 0.22);
+      ring(1.0, 0.55, 1.4); ring(1.06, 0.18, 1, [2, 6]);
+      // rim ticks
+      for (let i = 0; i < 120; i++) { const a = i / 120 * 6.283; const [x1, y1] = P(R, a), [x2, y2] = P(R * (i % 10 ? 1.025 : 1.05), a); g.strokeStyle = 'rgba(94,200,255,.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+      // sectors + labels
+      const n = cats.length; g.font = '600 12px Manrope, system-ui';
+      for (let i = 0; i < n; i++) { const a = i / n * 6.283; const [x0, y0] = P(0, a), [x1, y1] = P(R, a); g.strokeStyle = 'rgba(94,200,255,.12)'; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+        const [lx, ly] = P(R * 1.14, (i + 0.5) / n * 6.283); g.fillStyle = `rgba(${PAL[i % PAL.length].join(',')},.95)`; g.textAlign = 'center'; const tw = g.measureText(cats[i].name).width / 2 + 8; g.fillText(cats[i].name, Math.max(tw, Math.min(W - tw, lx)), ly + 4); g.textAlign = 'left'; }
+      // stage labels along one spoke
+      g.font = '500 9.5px "JetBrains Mono", monospace'; g.fillStyle = 'rgba(143,200,240,.5)'; for (const [, label, , outer] of BANDS) { const [x, y] = P(outer * R - 4, -Math.PI / 2 - yaw); g.fillText(label.toUpperCase(), x + 4, y); }
+      // sweep wedge on the disc
+      g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } for (let k = 0; k <= 24; k++) { const [x, y] = P(R, beam - 0.55 + k / 24 * 0.55); g.lineTo(x, y); } g.closePath();
+      const [bx, by] = P(R, beam); const sg = g.createLinearGradient(cx, cy, bx, by); sg.addColorStop(0, 'rgba(94,200,255,.05)'); sg.addColorStop(1, 'rgba(140,225,255,.22)'); g.fillStyle = sg; g.fill();
+      g.strokeStyle = 'rgba(190,240,255,.85)'; g.lineWidth = 1.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 10; g.beginPath(); { const [x, y] = P(0, 0); g.moveTo(x, y); } g.lineTo(bx, by); g.stroke(); g.shadowBlur = 0;
+      // centre pylon
+      { const [x, y] = P(0, 0); const pg = g.createLinearGradient(x, y, x, y - HT * 0.6); pg.addColorStop(0, 'rgba(143,225,255,.7)'); pg.addColorStop(1, 'rgba(143,225,255,0)'); g.strokeStyle = pg; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - HT * 0.6); g.stroke(); g.fillStyle = '#e6f8ff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 14; g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill(); g.shadowBlur = 0; }
+      // pins, back to front
+      const list = pins.map((p) => { const [bx2, by2, z] = P(p.rad * R, p.ang); return { p, bx: bx2, by: by2, z }; }).sort((a, b) => b.z - a.z);
+      hover = null; let best = 14;
+      for (const { p, bx: x, by: y } of list) {
+        let diff = (beam - p.ang) % 6.283; if (diff < 0) diff += 6.283; if (diff < 0.06) p.lit = 1; p.lit = Math.max(0, p.lit - dt * 0.4);
+        const h = p.ht * HT * (p.st === 'learning' ? 1 + 0.06 * Math.sin(now / 400 + p.rad * 10) : 1); const top = y - h * Math.max(0.35, sT);
+        const rgb = p.col.join(','); const a = p.st === 'suggested' ? 0.35 : p.st === 'todo' ? 0.7 : 1;
+        // shadow dot on the disc + stem
+        g.globalAlpha = 0.5 * a; g.fillStyle = `rgba(${rgb},.6)`; g.beginPath(); g.ellipse(x, y, 3, 3 * Math.max(0.25, cT), 0, 0, 7); g.fill();
+        if (h > 2) { const sg2 = g.createLinearGradient(x, y, x, top); sg2.addColorStop(0, `rgba(${rgb},.08)`); sg2.addColorStop(1, `rgba(${rgb},${0.75 * a})`); g.globalAlpha = 1; g.strokeStyle = sg2; g.lineWidth = 1.3; g.beginPath(); g.moveTo(x, y); g.lineTo(x, top); g.stroke(); }
+        const dd = Math.hypot(mouse.x - x, mouse.y - top); if (dd < best) { best = dd; hover = { p, x, y: top }; }
+        const size = (p.st === 'learned' ? 4.2 : p.st === 'learning' ? 4.4 : p.st === 'todo' ? 3 : 2.2) + 1.6 * p.lit;
+        g.globalAlpha = Math.min(1, a + p.lit * 0.5); g.fillStyle = `rgb(${rgb})`; g.shadowColor = `rgb(${rgb})`; g.shadowBlur = (p.st === 'learned' ? 12 : 6) + 14 * p.lit; g.beginPath(); g.arc(x, top, size, 0, 7); g.fill(); g.shadowBlur = 0;
+        if (p.st === 'learning') { const k = (now / 1500 + p.rad) % 1; g.globalAlpha = 0.7 * (1 - k); g.strokeStyle = `rgb(${rgb})`; g.lineWidth = 1.1; g.beginPath(); g.arc(x, top, 6 + k * 14, 0, 7); g.stroke(); }
       }
-      // sweep
-      g.save(); g.translate(cx, cy); g.rotate(beam - Math.PI / 2);
-      if (g.createConicGradient) { const sw = g.createConicGradient(0, 0, 0); sw.addColorStop(0, 'rgba(94,200,255,0)'); sw.addColorStop(0.8, 'rgba(94,200,255,0)'); sw.addColorStop(0.97, 'rgba(94,200,255,.14)'); sw.addColorStop(1, 'rgba(140,225,255,.4)'); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R, 0, 7); g.fill(); }
-      g.strokeStyle = 'rgba(190,240,255,.8)'; g.lineWidth = 1.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 10; g.beginPath(); g.moveTo(0, 0); g.lineTo(R, 0); g.stroke(); g.restore();
-      // topic dots
-      hover = null; let best = 12;
-      for (const d of dots) {
-        const a = d.ang - Math.PI / 2; const x = cx + Math.cos(a) * d.rad * R, y = cy + Math.sin(a) * d.rad * R; d.x = x; d.y = y;
-        let diff = (beam - d.ang) % 6.283; if (diff < 0) diff += 6.283; if (diff < 0.06) d.lit = 1; d.lit = Math.max(0, d.lit - dt * 0.35);
-        const base = d.st === 'learned' ? 4.6 : d.st === 'learning' ? 4.8 : d.st === 'todo' ? 3.2 : 2.4;
-        const alpha = d.st === 'suggested' ? 0.35 : d.st === 'todo' ? 0.65 : 1;
-        const dd = Math.hypot(mouse.x - x, mouse.y - y); if (dd < best) { best = dd; hover = d; }
-        g.globalAlpha = Math.min(1, alpha + d.lit * 0.6); g.fillStyle = `rgb(${d.col.join(',')})`; g.shadowColor = g.fillStyle; g.shadowBlur = (d.st === 'learned' ? 10 : 4) + 14 * d.lit;
-        g.beginPath(); g.arc(x, y, base + 1.5 * d.lit, 0, 7); g.fill(); g.shadowBlur = 0;
-        if (d.st === 'learning') { const k = (now / 1500 + d.rad) % 1; g.globalAlpha = 0.7 * (1 - k); g.strokeStyle = g.fillStyle; g.lineWidth = 1.2; g.beginPath(); g.arc(x, y, 6 + k * 14, 0, 7); g.stroke(); }
-      }
-      g.globalAlpha = 1; g.fillStyle = '#fff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 16; g.beginPath(); g.arc(cx, cy, 3.5, 0, 7); g.fill(); g.shadowBlur = 0;
+      g.globalAlpha = 1;
       if (hover) {
-        g.strokeStyle = `rgb(${hover.col.join(',')})`; g.lineWidth = 1.4; g.beginPath(); g.arc(hover.x, hover.y, 10, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
+        g.strokeStyle = `rgb(${hover.p.col.join(',')})`; g.lineWidth = 1.4; g.beginPath(); g.arc(hover.x, hover.y, 10, 0, 7); g.stroke(); cv.style.cursor = 'pointer';
         tip.style.display = 'block'; tip.style.left = Math.min(hover.x, W - 265) + 'px'; tip.style.top = hover.y + 'px';
-        tip.innerHTML = `<small style="color:rgb(${hover.col.join(',')})">${esc(hover.cat)} · ${hover.stage}</small><b>${esc(hover.name)}</b>Tap to open`;
+        tip.innerHTML = `<small style="color:rgb(${hover.p.col.join(',')})">${esc(hover.p.cat)} · ${hover.p.stage}</small><b>${esc(hover.p.name)}</b>Tap to open`;
       } else { tip.style.display = 'none'; cv.style.cursor = ''; }
     }
     rebuild();
   }
 
   /* =====================================================================
-   * JARVIS SONAR CORE: rotating rings and ticks; reacts to listening / thinking / speaking
+   * JARVIS GYRO CORE: three rings turning on their own 3D axes around a glowing sphere,
+   * a circular equaliser that dances with the voice, orbiting sparks, a rotating text ring.
    * ===================================================================== */
   function mountJarvisCore() {
     const log = document.getElementById('jLog'); if (!log || document.querySelector('.j-core')) return;
     const el = document.createElement('div'); el.className = 'j-core'; el.innerHTML = '<canvas aria-hidden="true"></canvas><div class="st" id="jcSt">Online</div>';
     log.parentNode.insertBefore(el, log);
-    const st = el.querySelector('#jcSt'); let energy = 0.2, t = 0, mode = 'idle';
-    const rings = [[0.34, 0.5, 0, 40], [0.5, -0.3, 6, 0], [0.66, 0.18, 0, 90], [0.82, -0.12, 14, 0], [0.98, 0.06, 0, 160]];
+    const st = el.querySelector('#jcSt'); let energy = 0.2, t = 0, mode = 'idle', lvl = new Float32Array(64);
+    let seed = 9; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const sparks = Array.from({ length: 70 }, () => ({ r: 0.55 + rnd() * 0.5, a: rnd() * 6.283, tilt: (rnd() - 0.5) * 1.6, sp: 0.2 + rnd() * 0.8, s: rnd() }));
+    const gyros = [{ r: 0.62, ax: 1.15, sp: 0.55, seg: [0.9, 0.25, 1.6, 0.4, 0.6, 0.3] }, { r: 0.74, ax: -0.7, sp: -0.38, seg: [2.2, 0.3, 0.5, 0.35] }, { r: 0.86, ax: 0.35, sp: 0.24, seg: [0.25, 0.12] }];
+    const TEXT = 'J.A.R.V.I.S · LEARNING GALAXY · ONLINE · ';
     canvasLoop(el, (g, W, H, now, dt) => {
       t += dt; const orb = document.getElementById('orb'); const sub = (document.getElementById('jSub') || {}).textContent || '';
       mode = /Speaking/i.test(sub) ? 'speaking' : /Listening/i.test(sub) ? 'listening' : (orb && orb.classList.contains('busy')) || /Thinking/i.test(sub) ? 'thinking' : 'idle';
       st.textContent = { idle: 'Online', listening: 'Listening', thinking: 'Thinking', speaking: 'Speaking' }[mode];
-      energy += ({ idle: 0.2, listening: 0.55, thinking: 0.9, speaking: 0.65 }[mode] - energy) * Math.min(1, dt * 3);
-      const voice = mode === 'speaking' ? Math.abs(Math.sin(t * 9) * Math.sin(t * 3.1)) : mode === 'listening' ? Math.abs(Math.sin(t * 5) * Math.sin(t * 1.7)) : 0;
-      const cx = W / 2, cy = H / 2 - 6, R = Math.min(W, H) * 0.4; const sp = 0.5 + energy * 2.2;
-      g.clearRect(0, 0, W, H); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
-      const cg = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.2); cg.addColorStop(0, `rgba(94,200,255,${0.12 + energy * 0.12 + voice * 0.15})`); cg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = cg; g.fillRect(0, 0, W, H);
-      // rings: solid, dashed, or tick rings, each turning at its own speed
-      rings.forEach(([rr, speed, dash, ticks], i) => {
-        const rad = rr * R * (1 + (i === 2 ? voice * 0.08 : 0)); const rot = t * speed * sp;
-        g.save(); g.translate(cx, cy); g.rotate(rot); g.strokeStyle = `rgba(94,200,255,${0.25 + 0.25 * energy})`; g.lineWidth = i === 4 ? 1.2 : 1;
-        if (ticks) { for (let k = 0; k < ticks; k++) { const a = k / ticks * 6.283, L = k % 10 ? 3 : 7; g.beginPath(); g.moveTo(Math.cos(a) * rad, Math.sin(a) * rad); g.lineTo(Math.cos(a) * (rad - L), Math.sin(a) * (rad - L)); g.stroke(); } }
-        else { g.setLineDash([dash, dash]); g.beginPath(); g.arc(0, 0, rad, 0, 7); g.stroke(); g.setLineDash([]); }
-        // a bright arc segment on each ring
-        g.strokeStyle = `rgba(160,230,255,${0.5 + 0.4 * energy})`; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, rad, 0, 0.5 + i * 0.15); g.stroke();
-        g.restore();
-      });
-      // voice ring: a waveform around the core
-      g.strokeStyle = `rgba(190,240,255,${0.5 + voice * 0.5})`; g.lineWidth = 1.5; g.beginPath();
-      for (let k = 0; k <= 96; k++) { const a = k / 96 * 6.283; const w = 1 + (voice * 0.22 + 0.02) * Math.sin(a * 8 + t * 10) * Math.sin(a * 3 - t * 4); const x = cx + Math.cos(a) * R * 0.22 * w, y = cy + Math.sin(a) * R * 0.22 * w; k ? g.lineTo(x, y) : g.moveTo(x, y); }
-      g.stroke();
-      // sweep
-      g.save(); g.translate(cx, cy); g.rotate(t * sp * 1.4);
-      if (g.createConicGradient) { const sw = g.createConicGradient(0, 0, 0); sw.addColorStop(0, 'rgba(94,200,255,0)'); sw.addColorStop(0.82, 'rgba(94,200,255,0)'); sw.addColorStop(1, `rgba(140,225,255,${0.25 + energy * 0.25})`); g.fillStyle = sw; g.beginPath(); g.arc(0, 0, R * 0.98, 0, 7); g.fill(); }
+      energy += ({ idle: 0.2, listening: 0.55, thinking: 0.95, speaking: 0.7 }[mode] - energy) * Math.min(1, dt * 3);
+      const voice = mode === 'speaking' ? 0.35 + 0.65 * Math.abs(Math.sin(t * 8.3) * Math.sin(t * 2.9)) : mode === 'listening' ? 0.25 + 0.6 * Math.abs(Math.sin(t * 4.7) * Math.sin(t * 1.3)) : 0.04;
+      const cx = W / 2, cy = H / 2 - 12, R = Math.min(W * 0.38, H * 0.38); const sp = 0.6 + energy * 2;
+      g.clearRect(0, 0, W, H); g.globalAlpha = 1;
+      // halo
+      const hg = g.createRadialGradient(cx, cy, 0, cx, cy, R * 1.25); hg.addColorStop(0, `rgba(94,200,255,${0.1 + energy * 0.1})`); hg.addColorStop(1, 'rgba(94,200,255,0)'); g.fillStyle = hg; g.fillRect(0, 0, W, H);
+      // rotating text ring (flat)
+      g.save(); g.translate(cx, cy); g.rotate(-t * 0.08 * sp); g.font = '500 8.5px "JetBrains Mono", monospace'; g.fillStyle = 'rgba(143,210,245,.5)';
+      const chars = (TEXT + TEXT).split(''); const step = 6.283 / chars.length; chars.forEach((ch, i) => { g.save(); g.rotate(i * step); g.translate(0, -R * 1.02); g.fillText(ch, -2.5, 0); g.restore(); }); g.restore();
+      // outer tick ring
+      g.save(); g.translate(cx, cy); g.rotate(t * 0.05 * sp); for (let i = 0; i < 90; i++) { const a = i / 90 * 6.283, L = i % 15 ? 3 : 7; g.strokeStyle = `rgba(94,200,255,${i % 15 ? 0.35 : 0.7})`; g.lineWidth = 1; g.beginPath(); g.moveTo(Math.cos(a) * R * 0.94, Math.sin(a) * R * 0.94); g.lineTo(Math.cos(a) * (R * 0.94 - L), Math.sin(a) * (R * 0.94 - L)); g.stroke(); } g.restore();
+      // circular equaliser
+      for (let i = 0; i < 64; i++) { const target = voice * (0.35 + 0.65 * Math.abs(Math.sin(i * 0.7 + t * 6) * Math.sin(i * 0.23 - t * 3.1))); lvl[i] += (target - lvl[i]) * Math.min(1, dt * 12); }
+      g.save(); g.translate(cx, cy); g.lineCap = 'round';
+      for (let i = 0; i < 64; i++) { const a = i / 64 * 6.283 - Math.PI / 2; const r0 = R * 0.3, r1 = r0 + R * (0.02 + lvl[i] * 0.22); g.strokeStyle = `rgba(${140 + lvl[i] * 100},${220 + lvl[i] * 30},255,${0.35 + lvl[i] * 0.6})`; g.lineWidth = 2; g.beginPath(); g.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); g.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); g.stroke(); }
       g.restore();
-      // thinking: scanning arc
-      if (mode === 'thinking') { const a = t * 4; g.strokeStyle = 'rgba(200,245,255,.9)'; g.lineWidth = 2.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 12; g.beginPath(); g.arc(cx, cy, R * 0.66, a, a + 0.9); g.stroke(); g.shadowBlur = 0; }
-      // core
-      g.fillStyle = '#e6f8ff'; g.shadowColor = '#5EC8FF'; g.shadowBlur = 18 + voice * 20; g.beginPath(); g.arc(cx, cy, 3.5 + voice * 3, 0, 7); g.fill(); g.shadowBlur = 0;
+      // gyroscope rings: circles on tilted planes, back half dim, front half bright, segmented
+      const drawGyro = (gy, front) => {
+        const rot = t * gy.sp * sp, ax = gy.ax + Math.sin(t * 0.3) * 0.15; const cA = Math.cos(ax), sA = Math.sin(ax), cR = Math.cos(rot * 0.6), sR = Math.sin(rot * 0.6);
+        let segI = 0, segLeft = gy.seg[0], on = true; const N = 140;
+        for (let k = 0; k < N; k++) {
+          const a0 = k / N * 6.283 + rot, a1 = (k + 1) / N * 6.283 + rot; segLeft -= 6.283 / N; if (segLeft <= 0) { segI = (segI + 1) % gy.seg.length; segLeft = gy.seg[segI]; on = !on; }
+          if (!on) continue;
+          const pt = (a) => { let x = Math.cos(a) * gy.r * R, y = Math.sin(a) * gy.r * R, z = 0; [y, z] = [y * cA, y * sA]; [x, z] = [x * cR - z * sR, x * sR + z * cR]; return [cx + x, cy + y, z]; };
+          const [x0, y0, z0] = pt(a0), [x1, y1] = pt(a1); const isFront = z0 < 0; if (isFront !== front) continue;
+          g.strokeStyle = front ? `rgba(170,232,255,${0.55 + energy * 0.35})` : 'rgba(94,200,255,.18)'; g.lineWidth = front ? 2 : 1.2; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+        }
+      };
+      gyros.forEach((gy) => drawGyro(gy, false));
+      // core sphere
+      const pulse = 1 + voice * 0.12 + Math.sin(t * 1.6) * 0.02; const cr = R * 0.2 * pulse;
+      const sg = g.createRadialGradient(cx - cr * 0.3, cy - cr * 0.35, cr * 0.1, cx, cy, cr); sg.addColorStop(0, '#eafaff'); sg.addColorStop(0.35, '#7fd4ff'); sg.addColorStop(0.8, '#1f6fc0'); sg.addColorStop(1, 'rgba(10,40,90,.9)');
+      g.shadowColor = '#5EC8FF'; g.shadowBlur = 24 + voice * 30; g.fillStyle = sg; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.fill(); g.shadowBlur = 0;
+      g.strokeStyle = 'rgba(200,245,255,.6)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.stroke();
+      // latitude lines on the sphere
+      g.save(); g.beginPath(); g.arc(cx, cy, cr, 0, 7); g.clip(); g.strokeStyle = 'rgba(230,250,255,.25)'; for (let k = -2; k <= 2; k++) { g.beginPath(); g.ellipse(cx, cy + k * cr * 0.33, cr * Math.sqrt(1 - (k * 0.33) ** 2), cr * 0.12, 0, 0, 7); g.stroke(); }
+      const lon = (t * 0.8 * sp) % 6.283; for (let k = 0; k < 3; k++) { const w = Math.cos(lon + k * 1.05) * cr; g.beginPath(); g.ellipse(cx, cy, Math.abs(w), cr, 0, 0, 7); g.stroke(); } g.restore();
+      gyros.forEach((gy) => drawGyro(gy, true));
+      // sparks
+      for (const s of sparks) { s.a += dt * s.sp * sp * 0.6; const x = Math.cos(s.a) * s.r * R, y = Math.sin(s.a) * s.r * R * Math.cos(s.tilt); const z = Math.sin(s.a) * Math.sin(s.tilt); g.globalAlpha = (0.25 + 0.5 * (1 - (z + 1) / 2)) * (0.6 + energy * 0.5); g.fillStyle = s.s < 0.15 ? '#e6f8ff' : '#7fd4ff'; const sz = s.s < 0.15 ? 2 : 1.2; g.fillRect(cx + x, cy + y, sz, sz); }
+      g.globalAlpha = 1;
+      // thinking: a bright arc racing around
+      if (mode === 'thinking') { const a = t * 5; g.strokeStyle = 'rgba(220,250,255,.95)'; g.lineWidth = 2.5; g.shadowColor = '#5EC8FF'; g.shadowBlur = 14; g.beginPath(); g.arc(cx, cy, R * 0.94, a, a + 0.7); g.stroke(); g.beginPath(); g.arc(cx, cy, R * 0.94, a + Math.PI, a + Math.PI + 0.7); g.stroke(); g.shadowBlur = 0; }
     });
   }
 
