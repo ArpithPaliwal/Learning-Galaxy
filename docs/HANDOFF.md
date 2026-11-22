@@ -78,3 +78,12 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - Netlify "Powered by Netlify" badge hidden: `<div id="nl-hud-frame" hidden>` + `#nl-badge-frame` make Netlify's injected HUD script skip itself (it checks these ids). Confirmed no badge iframe live.
 - Feature pipeline test: issue #1 "Daily quote under the greeting on Today" filed to exercise build → test → merge.
 - Netlify repo LINKED (2026-11-22): every push to main deploys automatically (verified). No more manual deploys needed.
+
+## Daily automation (2026-11-22)
+| Time (IST) | Workflow | What | Needs |
+|---|---|---|---|
+| 06:00 | `daily-feed.yml` | Claude researches GitHub trending, AI news, tools, YouTube videos → `app/feed/latest.json` (validated by `scripts/validate-feed.mjs`; keeps yesterday's if invalid) → commit → Netlify deploys | CLAUDE_CODE_OAUTH_TOKEN only |
+| 06:30 | `cloud-job.yml` | Personal data: course videos, research dossiers, digest (writes to Supabase via `scripts/db.mjs`) | a signed-in user (skips quietly until then) |
+| on issue | `feature-request.yml` | Builds requested features, tests, merges → Netlify deploys | done/verified (issue #1 → PR #2) |
+- App side: `LG.loadFeed()` merges the public feed into news/trends on load and every 3h (non-dirty, not uploaded).
+- Radar has "AI tools" and "Videos" filters (`newsTag`: kind tool/video).
