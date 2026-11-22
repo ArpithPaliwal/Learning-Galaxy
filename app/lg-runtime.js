@@ -360,7 +360,26 @@
   /* make sure the app's "cloud job" buttons are enabled: it checks meta/refresh for trigger ids */
   store.ready.then(() => { const r = store.get('meta/refresh'); if (!r || !r.triggerId || !r.courseTriggerId) store.db.doc('meta/refresh').set(Object.assign({}, r || {}, { triggerId: (r && r.triggerId) || 'gh-daily', courseTriggerId: (r && r.courseTriggerId) || 'gh-courses' })); });
 
-  window.LG = Object.assign(window.LG || {}, { cfg, bus, store, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
+  /* ---------- public daily feed (news, trending, tools, videos) ----------
+   * feed/latest.json is published with the app (it is not personal). Every device merges it into its
+   * local news/trends collections, so the Radar is fresh even without signing in. Items are applied as
+   * "remote" records (not uploaded to your sync database). */
+  async function loadFeed() {
+    try {
+      const res = await fetch('feed/latest.json', { cache: 'no-cache' }); if (!res.ok) return;
+      const f = await res.json(); await store.ready;
+      const at = Date.parse(f.generated || f.date) || Date.now(); let n = 0;
+      for (const it of [...(f.news || []), ...(f.tools || []), ...(f.videos || [])]) {
+        if (!it || !it.id || !it.title || !/^https?:/.test(it.url || '')) continue;
+        if (store.applyRemote({ path: 'news/' + it.id, data: Object.assign({ date: f.date, added: f.date }, it), updated: at, deleted: false })) n++;
+      }
+      if (f.trends && f.date) store.applyRemote({ path: 'trends/' + f.date, data: Object.assign({ date: f.date, updated: f.generated || f.date }, f.trends), updated: at, deleted: false });
+      if (n) emit('feed', { n, date: f.date });
+    } catch (e) { console.warn('feed', e); }
+  }
+  loadFeed(); setInterval(loadFeed, 3 * 3600e3);
+
+  window.LG = Object.assign(window.LG || {}, { cfg, bus, store, loadFeed, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
 
   Sync.handleRedirect().finally(() => Sync.soon(400));
 })();

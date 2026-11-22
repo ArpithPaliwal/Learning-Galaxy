@@ -240,8 +240,8 @@
   /* =====================================================================
    * RADAR
    * ===================================================================== */
-  const KINDSL = [[0, 120, 205], [0, 150, 105], [200, 120, 0], [118, 74, 230], [205, 50, 105]];
-  const KINDS = [['launch', 'Launches', [94, 200, 255]], ['repo', 'Repos', [61, 220, 151]], ['paper', 'Papers', [255, 181, 71]], ['article', 'Articles', [182, 156, 255]], ['practice', 'Practice', [255, 138, 170]]];
+  const KINDSL = [[0, 120, 205], [0, 150, 105], [200, 120, 0], [118, 74, 230], [205, 50, 105], [190, 130, 0], [200, 40, 40]];
+  const KINDS = [['launch', 'Launches', [94, 200, 255]], ['repo', 'Repos', [61, 220, 151]], ['paper', 'Papers', [255, 181, 71]], ['article', 'Articles', [182, 156, 255]], ['practice', 'Practice', [255, 138, 170]], ['tool', 'Tools', [255, 214, 102]], ['video', 'Videos', [255, 99, 99]]];
   function mountRadar() {
     const view = document.getElementById('v-radar'); if (!view || view.querySelector('.lgv-rd')) return;
     const head = view.querySelector('.sm-head');
@@ -259,7 +259,7 @@
       blips = items.map((n) => {
         const k = KINDS.findIndex(([id]) => id === n.kind); const ki = k < 0 ? 3 : k; const age = (newest - day(n.date || n.added).getTime()) / 864e5;
         const sector = (ki / KINDS.length) * 6.283; const ang = sector + (0.12 + hash(n.id || n.title) * 0.76) * (6.283 / KINDS.length);
-        return { n, get col() { return isLight() ? KINDSL[ki] : KINDS[ki][2]; }, kind: KINDS[ki][1], ang, rad: 0.12 + 0.82 * Math.min(1, age / span), lit: 0 };
+        return { n, get col() { return isLight() ? KINDSL[ki] : KINDS[ki][2]; }, kind: KINDS[ki][1], ang, rad: 0.14 + 0.8 * Math.min(1, 0.65 * Math.min(1, age / span) + 0.35 * hash((n.id || n.title) + 'r')), lit: 0 };
       });
       const learning = [...data.topics.values()].filter((t) => t.status === 'learning' || t.status === 'todo').map((t) => String(t.title || '').toLowerCase());
       const pick = items.find((n) => n.topic && learning.some((l) => l && (l.includes(String(n.topic).toLowerCase().slice(0, 14)) || String(n.topic).toLowerCase().includes(l.slice(0, 14))))) || items.find((n) => n.kind === 'launch') || items[0];

@@ -146,6 +146,7 @@ test('Gemini uses generateContent with x-goog-api-key and model roles', async ()
 test('a browser-blocked provider falls back to the app relay and remembers it', async () => {
   const calls = [];
   const { win } = boot({ ai: { provider: 'cerebras', key: 'csk-1' }, fetch: async (u, o) => {
+    if (u === 'feed/latest.json') return { ok: false, status: 404 }; // the daily feed loader, not under test here
     calls.push(u);
     if (u.startsWith('https://api.cerebras.ai')) throw new TypeError('Failed to fetch');
     const inner = JSON.parse(o.body); assert.equal(inner.url, 'https://api.cerebras.ai/v1/chat/completions'); assert.equal(inner.headers.authorization, 'Bearer csk-1');

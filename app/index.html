@@ -1897,9 +1897,9 @@ async function addWatch(q){ q = String(q||'').trim(); if (!q) return; if (watchL
   const ok = await fireBot('daily'); toast(ok ? 'Watching "' + q + '". Researching now.' : 'Watching "' + q + '". The morning job will research it.'); }
 /* ============ RADAR ============ */
 function relDate(s){ if (!s) return ''; const d = Math.round((parseD(today()) - parseD(String(s).slice(0,10))) / 86400000); if (d <= 0) return 'today'; if (d === 1) return 'yesterday'; if (d < 14) return d + ' days ago'; return parseD(String(s).slice(0,10)).toLocaleDateString(undefined, {day:'numeric', month:'short'}); }
-const RD_TAGS = [['all','All'],['watch','★ Watchlist'],['ai','AI models'],['agentic','Agentic AI'],['systems','AI systems'],['papers','Papers'],['repos','Repos']];
+const RD_TAGS = [['all','All'],['watch','★ Watchlist'],['ai','AI models'],['agentic','Agentic AI'],['tools','AI tools'],['videos','Videos'],['systems','AI systems'],['papers','Papers'],['repos','Repos']];
 let rdTag = LS.get('rdTag', 'all');
-const newsTag = n => n.tag || (n.kind === 'paper' ? 'papers' : n.kind === 'repo' ? 'repos' : n.cat === 'sys' ? 'systems' : /agent|mcp|tool[- ]?call|autonom|multi-agent|harness/i.test((n.title||'') + ' ' + (n.summary||'')) ? 'agentic' : 'ai');
+const newsTag = n => n.tag || (n.kind === 'tool' ? 'tools' : n.kind === 'video' ? 'videos' : n.kind === 'paper' ? 'papers' : n.kind === 'repo' ? 'repos' : n.cat === 'sys' ? 'systems' : /agent|mcp|tool[- ]?call|autonom|multi-agent|harness/i.test((n.title||'') + ' ' + (n.summary||'')) ? 'agentic' : 'ai');
 renderers.push(function radar_(){
   if (S.tab !== 'radar') return;
   const tr = [...C('trends').values()].sort((a,b) => String(b.date||b.id).localeCompare(String(a.date||a.id)))[0];
