@@ -6,7 +6,7 @@ Last updated: 2026-11-22. Read this first, then `CLAUDE.md` (architecture) and `
 | Piece | Where | State |
 |---|---|---|
 | Code | github.com/ArpithPaliwal/Learning-Galaxy (PUBLIC, `main`) · local `C:\Users\arpit\learning-galaxy` | v2 PWA. Old Gist version kept at tag `v1-gist`. |
-| Hosting | Netlify site `learning-galaxy-arpit` (id `ee2077a9-b3b8-4c62-9a69-23b7bfd42ab6`) → https://learning-galaxy-arpit.netlify.app | Live. Deployed by uploading via the Netlify MCP (`deploy-site` → `npx @netlify/mcp … --site-id …`). **Repo not confirmed linked** for auto-deploy (user step: Netlify → Project configuration → Build & deploy → Link repository). Check: `gh api repos/ArpithPaliwal/Learning-Galaxy/hooks` or push and see if a deploy appears. |
+| Hosting | Netlify site `learning-galaxy-arpit` (id `ee2077a9-b3b8-4c62-9a69-23b7bfd42ab6`) → https://learning-galaxy-arpit.netlify.app | Live. Deployed by uploading via the Netlify MCP (`deploy-site` → `npx @netlify/mcp … --site-id …`). Repo linked: pushes to main deploy automatically. Check: `gh api repos/ArpithPaliwal/Learning-Galaxy/hooks` or push and see if a deploy appears. |
 | Database | Supabase org `pckmexwjhbbqdmhecrgp` ("Arpit Personal"), project `learning-galaxy`, ref `aqkiczctlqpkbhzucxmp`, region ap-south-1 (free) | Table `lg_docs` + RLS + trigger applied (`supabase/migrations/`). Auth site URL + redirects pushed (`supabase/config.toml`). URL + anon key baked into `app/config.js` (public by design). |
 | DB password | `C:\Users\arpit\Documents\learning-galaxy-supabase-db-password.txt` (line 2) | Needed for `supabase db push --remote -p …`. Never print or commit it. |
 | GitHub secrets | `CLAUDE_CODE_OAUTH_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Set. **`LG_USER_ID` missing** → cloud job fails its setup check until set. |
@@ -77,4 +77,4 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - Cloud job no longer needs LG_USER_ID (db.mjs finds the single user).
 - Netlify "Powered by Netlify" badge hidden: `<div id="nl-hud-frame" hidden>` + `#nl-badge-frame` make Netlify's injected HUD script skip itself (it checks these ids). Confirmed no badge iframe live.
 - Feature pipeline test: issue #1 "Daily quote under the greeting on Today" filed to exercise build → test → merge.
-- Netlify repo still NOT linked → merged features need a manual deploy (Netlify MCP) until the user links it.
+- Netlify repo LINKED (2026-11-22): every push to main deploys automatically (verified). No more manual deploys needed.
