@@ -37,6 +37,7 @@ for (const [, src] of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
 if (!html.includes('class="top"') || !html.includes('class="right"')) fail('top bar (.top .right) is missing: the ⚡ App button mounts there');
 if (!html.includes("case 'build_feature'")) fail("Jarvis lost the build_feature action");
 JSON.parse(readFileSync('app/manifest.webmanifest', 'utf8')); ok('manifest is valid JSON');
+if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < html.indexOf('</head>'))) fail('<link rel="manifest"> must be inside <head> (Chrome ignores it in <body>, so the app cannot be installed)'); else ok('manifest link is in <head>');
 // installability: browsers refuse a manifest sent as octet-stream (we also send nosniff)
 {
   const toml = readFileSync('netlify.toml', 'utf8');
