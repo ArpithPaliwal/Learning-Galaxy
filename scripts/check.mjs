@@ -50,6 +50,9 @@ if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < htm
 // courses are written by Claude Code through GitHub in the installed app: the in-app AI key must never draft them
 { const n = (html.match(/draftCourse\(/g) || []).length; if (!html.includes('requestClaudeCourse(id, ask, level, perDay)') || n !== 2) fail('createCourse must route the installed app to requestClaudeCourse; draftCourse is only for the claude.ai edition (expected 2 mentions, found ' + n + ')'); else ok('courses are requested from Claude through GitHub'); }
 
+// Jarvis reply style (length + tone) must reach the prompt and be changeable by Jarvis itself
+{ const ok2 = html.includes('${styleLine()}') && html.includes("case 'reply_style'") && html.includes('id="jStyle"'); if (!ok2) fail('Jarvis reply style: styleLine() in the prompt, the reply_style action and the Aa button are all required'); else ok('Jarvis reply style is wired'); }
+
 { const fe = validateFeed(JSON.parse(readFileSync('app/feed/latest.json', 'utf8'))); if (fe.length) fail('feed: ' + fe.join('; ')); else ok('daily feed is valid'); }
 
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }

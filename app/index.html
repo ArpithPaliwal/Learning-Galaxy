@@ -818,6 +818,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
         <div class="j-wave" id="jWave" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
       <div class="acts">
         <button class="iconbtn" id="jAudit" title="Token audit" aria-label="Token audit">🧾</button>
+        <button class="iconbtn" id="jStyle" title="Reply style: length and tone" aria-label="Reply style" style="font:700 13px var(--f-hud)">Aa</button>
         <button class="iconbtn" id="jDeep" title="Deep think: smarter, slower answers" aria-label="Deep think">🧠</button>
         <button class="iconbtn" id="jVoice" title="Voice on (tap to mute)" aria-label="Voice on or off" hidden>🔊</button>
         <button class="iconbtn" id="jClear" title="Clear conversation" aria-label="Clear conversation">⟲</button>
@@ -1377,6 +1378,33 @@ Unfinished paths:\n${paths || 'none'}
 Open tasks:\n${tasks}
 DSA (Striver A2Z): ${ps.filter(p => p.status === 'solved').length}/${ps.length} solved${nextP ? `, next: "${nextP.title}" (step ${nextP.step}, ${nextP.diff}) ${nextP.url||''}` : ''}.`;
 }
+/* ---- reply style: how long and in what voice Jarvis answers (saved per device) ---- */
+const LEN = {line:{n:'One line', w:15}, short:{n:'Short', w:40}, normal:{n:'Balanced', w:120}, detailed:{n:'Detailed', w:300}, long:{n:'Long', w:600}};
+const TONES = {persona:['Persona default',''], witty:['Witty','playful, clever and light, with a dry joke when it fits, never at the expense of clarity'], formal:['Formal','polite, precise and professional'],
+  casual:['Casual','relaxed and conversational, everyday words'], warm:['Warm & encouraging','supportive and positive, celebrates progress'], blunt:['Blunt','direct, no pleasantries, straight to the point'],
+  simple:['Explain simply','plain words, short sentences and a concrete example, as if the learner is new to the topic'], hinglish:['Hinglish','a casual Hindi and English mix in Latin script, like a friendly Indian mentor']};
+const replyStyle = () => ({len: LEN[LS.get('jLen','normal')] ? LS.get('jLen','normal') : 'normal', words: Math.max(0, Math.min(2000, Number(LS.get('jWords', 0)) || 0)), tone: TONES[LS.get('jTone','persona')] ? LS.get('jTone','persona') : 'persona', note: String(LS.get('jNote','')).slice(0, 300)});
+function styleLine(){ const s = replyStyle(), L = LEN[s.len], cap = s.words || L.w;
+  return `REPLY LENGTH: about ${cap} words${s.words ? ' (the learner set this exact limit)' : ' (' + L.n.toLowerCase() + ')'}${s.len === 'line' && !s.words ? ', one sentence if possible' : ''}. Treat it as a ceiling for normal answers; go past it only when the learner explicitly asks for a full explanation, lesson, plan or quiz, and then stay as tight as you can. Never cut off the actions block.`
+    + (TONES[s.tone][1] ? `\nREPLY TONE: ${TONES[s.tone][1]}. Keep your persona's name and how you address the learner.` : '')
+    + (s.note ? `\nThe learner's own style note (follow it): ${s.note}` : ''); }
+function openStyle(){
+  const s = replyStyle();
+  const chips = (key, items, cur) => items.map(([k, n]) => `<button class="btn small ${k === cur ? 'primary' : ''}" data-sk="${key}" data-sv="${k}">${esc(n)}</button>`).join('');
+  openModal(`<h3>How Jarvis replies</h3>
+    <div class="field"><span class="label">Length</span><div class="row" style="gap:6px">${chips('jLen', Object.entries(LEN).map(([k, v]) => [k, v.n + ' · ~' + v.w]), s.len)}</div></div>
+    <div class="field"><span class="label">Or an exact word limit (optional)</span><input class="inp" id="stW" type="number" min="0" max="2000" step="5" placeholder="e.g. 60 · leave empty to use the length above" value="${s.words || ''}"></div>
+    <div class="field"><span class="label">Tone</span><div class="row" style="gap:6px">${chips('jTone', Object.entries(TONES).map(([k, v]) => [k, v[0]]), s.tone)}</div></div>
+    <div class="field"><span class="label">Anything else (optional)</span><textarea class="inp" id="stN" rows="2" maxlength="300" placeholder="e.g. Always end with one next step. Use analogies from cricket.">${esc(s.note)}</textarea></div>
+    <p class="faint" style="font-size:13px" id="stSum"></p>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="stReset">Reset to default</button><button class="btn primary" data-close>Done</button></div>`, () => {
+    const sum = () => { const t = replyStyle(), L = LEN[t.len]; $('#stSum').textContent = 'Jarvis will reply in about ' + (t.words || L.w) + ' words' + (TONES[t.tone][1] ? ', in a ' + TONES[t.tone][0].toLowerCase() + ' tone' : '') + '.'; };
+    $$('#mcard [data-sk]').forEach(b => b.onclick = () => { LS.set(b.dataset.sk, b.dataset.sv); $$('#mcard [data-sk="' + b.dataset.sk + '"]').forEach(x => x.classList.toggle('primary', x === b)); sum(); });
+    $('#stW').oninput = e => { LS.set('jWords', Number(e.target.value) || 0); sum(); };
+    $('#stN').oninput = e => LS.set('jNote', e.target.value.slice(0, 300));
+    $('#stReset').onclick = () => { for (const k of ['jLen', 'jWords', 'jTone', 'jNote']) LS.set(k, k === 'jLen' ? 'normal' : k === 'jTone' ? 'persona' : k === 'jWords' ? 0 : ''); toast('Reply style reset.'); openStyle(); };
+    sum(); });
+}
 const ACTION_HELP = `YOU CAN OPERATE THE WHOLE APP. When the learner asks you to do or change anything (or clearly agrees to your offer), end your reply with ONE fenced block:
 \`\`\`actions
 [ ...action objects... ]
@@ -1392,7 +1420,7 @@ TASKS  {"type":"add_task","title":"...","due":"YYYY-MM-DD or empty"} · {"type":
 DO NOW {"type":"attention"} (attention visualiser) · {"type":"lab"} (opens the live neural-network playground) · {"type":"battle","topic":"..."} (quiz-battle training simulation on a topic) · {"type":"focus","minutes":25,"title":"..."} · {"type":"teach_back","title":"concept"} · {"type":"review"} · {"type":"open","screen":"today|skillmap|courses|library|settings","sub":"topics|paths|research|dsa|news|tasks"} · {"type":"open_course","course_id":"..."}
 WATCH  {"type":"watch","topic":"..."} (radar keeps tracking it) · {"type":"unwatch","topic":"..."}
 CLOUD  {"type":"research","query":"what to research","mode":"learn|compare|reverse"} (the cloud job researches the web) · {"type":"run_daily_job"}
-ME     {"type":"set_profile","hours":4,"goals":"..."} · {"type":"persona","id":"jarvis|friday|edith|vision|karen|desi"} · {"type":"voice","on":true}
+ME     {"type":"set_profile","hours":4,"goals":"..."} · {"type":"persona","id":"jarvis|friday|edith|vision|karen|desi"} · {"type":"voice","on":true} · {"type":"reply_style","length":"line|short|normal|detailed|long","words":80,"tone":"persona|witty|formal|casual|warm|blunt|simple|hinglish","note":"optional style instruction"} (changes how long and in what voice you reply from now on; use it when the learner says things like "be shorter", "more witty", "explain simply", "answer in 50 words"; include only the fields that change)
 BUILD  {"type":"build_feature","title":"short feature name","details":"what it should do, where it appears, how it looks/behaves, in the learner's words plus your clarifications","model":"sonnet|opus"} → Claude Code builds it into this app and ships it automatically (about 10-20 min; the learner reopens the app to get it). Use it whenever the learner asks for a NEW feature, screen, button, visual change or fix to how the app itself works (things no other action can do). Confirm in one line what will be built. Use "opus" only for big or tricky features.
 MEMORY {"type":"remember","fact":"durable fact about the learner (preferences, goals, struggles, schedule)"} · {"type":"forget","fact":"text to drop"}
 Say in plain words what you did, before the block. Never mention the block. Use remember whenever the learner tells you something worth keeping.
@@ -1438,6 +1466,12 @@ async function runActions(list){
       case 'run_daily_job': { const ok = await fireBot('daily'); done.push(ok ? 'Daily job started' : 'Could not start the daily job'); break; }
       case 'set_profile': { const p = profile(); await put('meta', 'profile', {name: p.name, hours: Number(a.hours) || p.hours, goals: a.goals != null ? String(a.goals) : p.goals}); done.push('Profile updated'); break; }
       case 'persona': if (PERSONAS.find(p => p.id === a.id)) { LS.set('persona', a.id); done.push(`Persona → ${persona().name}`); } break;
+      case 'reply_style': { const ch = [];
+        if (LEN[a.length]) { LS.set('jLen', a.length); LS.set('jWords', 0); ch.push(LEN[a.length].n.toLowerCase()); }
+        if (a.words != null && Number(a.words) >= 5) { LS.set('jWords', Math.min(2000, Math.round(Number(a.words)))); ch.push('about ' + Math.min(2000, Math.round(Number(a.words))) + ' words'); }
+        if (TONES[a.tone]) { LS.set('jTone', a.tone); ch.push(TONES[a.tone][0].toLowerCase() + ' tone'); }
+        if (typeof a.note === 'string') { LS.set('jNote', a.note.slice(0, 300)); ch.push(a.note ? 'your note' : 'note cleared'); }
+        if (ch.length) done.push('Reply style: ' + ch.join(', ')); break; }
       case 'voice': S.speak = a.on !== false; LS.set('speak', S.speak); done.push('Voice ' + (S.speak ? 'on' : 'off')); break;
       case 'build_feature': if (a.title && window.LG && window.LG.requestFeature) { try { const r = await window.LG.requestFeature(String(a.title), String(a.details || ''), {model: a.model === 'opus' ? 'opus' : 'sonnet', source: 'Jarvis'}); done.push(r && r.number ? `Build requested: #${r.number} ${a.title} (track it in ⚡ App → Builder)` : `Build request opened in GitHub: ${a.title} (press Submit)`); } catch(e){ done.push('Could not request the build: ' + (e.message || e)); } } break;
       case 'remember': if (a.fact) { const m = memory(); if (!m.includes(String(a.fact))) { JMEM = [...m, String(a.fact).slice(0, 200)].slice(-30); done.push('Remembered: ' + a.fact); } } break;
@@ -1490,7 +1524,9 @@ async function jarvisAsk(text, o={}){
   pending = [userMsg, {role:'assistant', content:'…'}]; S.jBusy = true; render();
   const SNAP = snapshot(); const P = persona(); const mem = memory();
   const sys = `You are ${P.name}, the learner's personal study AI and operator of their HUD-style study app. Personality: ${P.style}.${P.address ? ` Address the learner as "${P.address}" now and then (not every line).` : ''}
-Be genuinely smart: think about what actually helps this learner progress, notice patterns (e.g. collecting more than finishing), be specific (exact titles, minutes, next steps), and take action instead of just advising when they ask. Usually under 120 words unless explaining, teaching or quizzing; then be thorough and clear with an example. Light Markdown; tables are fine.
+Be genuinely smart: think about what actually helps this learner progress, notice patterns (e.g. collecting more than finishing), be specific (exact titles, minutes, next steps), and take action instead of just advising when they ask.
+${styleLine()}
+When you explain or teach, be clear and give an example. Light Markdown; tables are fine.
 Planning: respect weekly hours, keep days light (about ${Math.round((profile().hours||4)*60/5)} min), course videos in order (course_id + video_key), a short review now and then, skip past days. Quizzing: one question at a time, then wait and grade. When the learner asks you to build a course, path, roadmap or curriculum to learn something, ALWAYS include a create_course action (and schedule_course for existing courses) so it appears in the Courses tab; then tell them it is in Courses. HONESTY RULE: only say you did something (planned, created, saved, scheduled) if that exact action is in your actions block in this same reply; never claim an action you did not include. Existing courses are listed in the data with course_id; reuse them instead of duplicating.${img ? ' An image is attached: read it carefully (notes, slides, code, diagrams) and use it.' : ''}
 ${mem.length ? 'What you remember about the learner:\n- ' + mem.join('\n- ') + '\n' : ''}${ACTION_HELP}
 --- learner data ---
@@ -1516,6 +1552,7 @@ function briefMe(){ jarvisAsk(`Give me my spoken daily briefing in your own styl
 $('#jNameBtn').onclick = e => { e.stopPropagation(); $('#jPersonas').hidden = !$('#jPersonas').hidden; };
 document.addEventListener('click', e => { if (!e.target.closest('#jPersonas,#jNameBtn')) { const p = $('#jPersonas'); if (p) p.hidden = true; } });
 $('#jAudit').onclick = () => openAudit();
+$('#jStyle').onclick = () => openStyle();
 $('#jDeep').onclick = () => { S.deep = !S.deep; LS.set('deep', S.deep); toast(S.deep ? 'Deep think on: smarter, slower answers.' : 'Deep think off: fast answers.'); render(); };
 $('#jAttach').onclick = () => $('#jFile').click();
 $('#jFile').onchange = e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (f.size > 8e6) { toast('That image is too large (max 8 MB).'); return; } jImg = f; render(); $('#jInput').focus(); };
