@@ -124,7 +124,10 @@
     const showBase = cur.provider === 'custom' || cur.provider === 'azure' || P.group === 'local' || !!c.base;
     el.innerHTML = `<p class="lg-note">Jarvis, course drafting, quizzes and teach-back use this. Works with any provider: paste a key and it is recognised automatically. The key stays on this device and goes only to that provider.</p>
       <div class="field"><span class="label">Provider</span><select class="inp" id="aiP">${opts}</select><span class="faint" style="font-size:12.5px">${esc(P.note || '')}${P.keyUrl ? ` · <a href="${P.keyUrl}" target="_blank" rel="noopener">Get a key ↗</a>` : ''}</span></div>
-      ${P.noKey ? '' : `<div class="field"><span class="label">API key</span><input class="inp" id="aiK" type="password" autocomplete="off" placeholder="Paste your ${esc(P.label)} key" value="${esc(c.key || '')}"><span class="faint" id="aiDet" style="font-size:12.5px"></span></div>`}
+      ${P.noKey ? '' : `<div class="field"><span class="label">API key</span>
+        <div class="row" style="flex-wrap:nowrap"><input class="inp lg-key" id="aiK" type="text" name="lg-api-key-${cur.provider}" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" placeholder="Paste your ${esc(P.label)} key" value="${esc(c.key || '')}" style="flex:1;min-width:0">
+        <button class="iconbtn" id="aiEye" type="button" title="Show / hide key" aria-label="Show or hide key">👁</button><button class="btn small ghost" id="aiClr" type="button">Clear</button></div>
+        <span class="faint" id="aiFp" style="font-size:12.5px"></span><span class="faint" id="aiDet" style="font-size:12.5px"></span></div>`}
       <div class="lg-two"><div class="field"><span class="label">Model (normal)</span><input class="inp" id="aiM" placeholder="${esc(P.models.default || 'model name')}" value="${esc(c.default || '')}"></div>
       <div class="field"><span class="label">Model (deep think)</span><input class="inp" id="aiC" placeholder="${esc(P.models.complex || 'same as normal')}" value="${esc(c.complex || '')}"></div></div>
       <div class="field"><span class="label">Model (quick / eco)</span><input class="inp" id="aiQ" placeholder="${esc(P.models.quick || 'same as normal')}" value="${esc(c.quick || '')}"></div>
@@ -148,6 +151,22 @@
     };
     $('#aiP', el).onchange = () => { LG.cfg.set('ai', Object.assign(read(), { base: '', default: '', complex: '', quick: '', adv: undefined })); draw(); };
     const k = $('#aiK', el);
+    // what is actually in the box: a short fingerprint + sanity checks (so a stray autofill or a doubled paste is visible)
+    const KEYLEN = { groq: 56 };
+    const fp = () => { const out = $('#aiFp', el); if (!k || !out) return; const raw = k.value, key = raw.trim().replace(/^Bearer\s+/i, '');
+      if (!key) { out.textContent = ''; return; }
+      const warn = [];
+      if (/\s/.test(key)) warn.push('it contains spaces or line breaks');
+      const d = LG.detectProvider(key); const want = KEYLEN[d || $('#aiP', el).value];
+      if (want && key.length !== want) warn.push(`${LG.PROVIDERS[d || $('#aiP', el).value].label} keys are usually ${want} characters, this is ${key.length}`);
+      if (!d && /^(gsk_|AIza|sk-)/.test(key) === false) warn.push('it does not look like an API key (was a saved password filled in?)');
+      out.innerHTML = `Key in the box: <code>${esc(key.slice(0, 4))}…${esc(key.slice(-4))}</code> · ${key.length} characters` + (warn.length ? `<br><span style="color:var(--warn)">⚠ ${esc(warn.join('; '))}. Press Clear and paste it again.</span>` : ''); };
+    if (k) {
+      k.style.webkitTextSecurity = 'disc';
+      k.addEventListener('input', fp); fp();
+      $('#aiEye', el).onclick = () => { k.style.webkitTextSecurity = k.style.webkitTextSecurity === 'disc' ? 'none' : 'disc'; };
+      $('#aiClr', el).onclick = () => { k.value = ''; fp(); k.focus(); };
+    }
     if (k) k.oninput = () => { const d = LG.detectProvider(k.value); const out = $('#aiDet', el);
       if (d && d !== $('#aiP', el).value) { out.innerHTML = `Looks like a <b>${esc(LG.PROVIDERS[d].label)}</b> key. <a href="#" id="aiSw">Switch</a>`; $('#aiSw', el).onclick = (e) => { e.preventDefault(); LG.cfg.set('ai', { provider: d, key: k.value.trim() }); draw(); toast('Switched to ' + LG.PROVIDERS[d].label + '.'); }; }
       else out.textContent = ''; };
