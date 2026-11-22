@@ -4,6 +4,7 @@
 // - element ids used by lg-app.js's mount point exist
 import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
+import { validateFeed } from './validate-feed.mjs';
 
 let failed = 0;
 const fail = (m) => { console.error('✕ ' + m); failed++; };
@@ -45,6 +46,8 @@ if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < htm
   if (!toml.includes('for = "/manifest.webmanifest"') || !block.includes('Content-Type = "application/manifest+json"')) fail('netlify.toml must serve manifest.webmanifest as application/manifest+json');
   else ok('manifest content type set for install');
 }
+
+{ const fe = validateFeed(JSON.parse(readFileSync('app/feed/latest.json', 'utf8'))); if (fe.length) fail('feed: ' + fe.join('; ')); else ok('daily feed is valid'); }
 
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');

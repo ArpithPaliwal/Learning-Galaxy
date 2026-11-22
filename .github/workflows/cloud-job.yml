@@ -41,6 +41,7 @@ jobs:
           node-version: 24
 
       - name: Check setup
+        id: setup
         env:
           HAS_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.ANTHROPIC_API_KEY != '' }}
         run: |
@@ -49,9 +50,10 @@ jobs:
           [ -n "$SUPABASE_URL" ] || missing="$missing SUPABASE_URL"
           [ -n "$SUPABASE_SERVICE_KEY" ] || missing="$missing SUPABASE_SERVICE_KEY"
           if [ -n "$missing" ]; then echo "::error::Missing repo secrets:$missing (see docs/SETUP.md)"; exit 1; fi
-          node scripts/db.mjs cols
+          if ! node scripts/db.mjs cols; then echo "::notice::No signed-in user yet (sign in once in the app: App > Cloud sync). Skipping today."; echo "skip=true" >> "$GITHUB_OUTPUT"; fi
 
       - name: Claude runs the job
+        if: steps.setup.outputs.skip != 'true'
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

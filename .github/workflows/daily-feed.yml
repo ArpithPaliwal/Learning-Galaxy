@@ -1,0 +1,61 @@
+# Refreshes the public Radar feed (app/feed/latest.json) every morning: GitHub trending, AI news,
+# AI tools and YouTube videos. Claude Code researches with web search; the result is validated,
+# committed to main, and Netlify deploys it automatically. Needs only CLAUDE_CODE_OAUTH_TOKEN.
+name: Daily feed
+
+on:
+  schedule:
+    - cron: '30 0 * * *'   # 06:00 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-feed
+  cancel-in-progress: false
+
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Claude researches today's feed
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -uo pipefail
+          export TODAY="$(TZ=Asia/Kolkata date +%F)"
+          cp app/feed/latest.json "$RUNNER_TEMP/previous.json"
+          npx -y @anthropic-ai/claude-code@latest -p "$(cat jobs/feed.md)
+
+          Today is $TODAY." \
+            --model sonnet --max-turns 80 --permission-mode acceptEdits \
+            --allowedTools 'Read,Write,Edit,WebSearch,WebFetch,Bash(node scripts/validate-feed.mjs:*),Bash(date:*)' \
+            | tee "$RUNNER_TEMP/out.md"
+
+      - name: Validate (keep yesterday's feed if today's is broken)
+        run: |
+          if ! node scripts/validate-feed.mjs; then
+            echo "::warning::Today's feed failed validation; keeping the previous feed."
+            cp "$RUNNER_TEMP/previous.json" app/feed/latest.json
+            exit 1
+          fi
+
+      - name: Publish
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/feed/latest.json
+          if git diff --cached --quiet; then echo "Feed unchanged."; exit 0; fi
+          git commit -q -m "feed: $(node -e 'console.log(JSON.parse(require("fs").readFileSync("app/feed/latest.json","utf8")).date)') radar update"
+          git pull -q --rebase origin "${{ github.event.repository.default_branch }}"
+          git push -q origin HEAD:"${{ github.event.repository.default_branch }}"
+          { echo "### Daily feed"; node scripts/validate-feed.mjs; tail -c 1500 "$RUNNER_TEMP/out.md"; } >> "$GITHUB_STEP_SUMMARY"
