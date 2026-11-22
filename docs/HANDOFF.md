@@ -64,3 +64,9 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - Jarvis: `.j-core` sonar canvas above the chat; reads state from `#jSub` text and `#orb.busy`.
 - Theme init always sets `data-theme` (system mode resolves via matchMedia and follows changes).
 - Not reviewed yet: light theme with the new screens, phone layout of the skill chart / Jarvis core.
+
+## AI providers + feature requests (2026-11-22)
+- AI works with any provider: 20 presets in `lg-runtime.js` (PROVIDERS; same list as Expenses), protocols openai/anthropic/gemini, custom auth/path/query/headers, key-prefix detection, relay `netlify/functions/ai-proxy.ts` (`/api/ai-proxy`, same-origin only, no private hosts) used automatically when a provider blocks browsers (remembered in `lg.app.ai.proxy`). Verified live: relay reaches Groq.
+- Claude subscription can NOT power in-app chat (only Claude Code in GitHub Actions for feature builds). Offered: publish as a claude.ai artifact so Jarvis runs on the user's Claude account; not done yet.
+- "Request a feature" (✨ button / sidebar) matches Expenses: Builder Claude/Copilot/Save only, Model Sonnet/Opus/Haiku, When Ship now/Within 6h. No live end-to-end build test yet.
+- Skill Map = 3D holo-table; canvases are theme-aware (kit() in lg-visuals.js).
