@@ -26,18 +26,45 @@
   const store = window.LGStore.createStore({ name: 'learning-galaxy' });
   store.onChange(() => { emit('data'); Sync.soon(); });
 
-  /* ---------- AI ---------- */
+  /* ---------- AI: any provider (same list as the Expenses app) ---------- */
+  // protocol: openai (chat/completions, used by most), anthropic (messages), gemini (generateContent).
+  // models: quick / default / complex = eco, normal, deep think. All user-editable; ids change over time.
   const PROVIDERS = {
-    anthropic: { label: 'Claude (Anthropic)', base: 'https://api.anthropic.com/v1', models: { quick: 'claude-haiku-5-5', default: 'claude-sonnet-5-5', complex: 'claude-opus-5-5' }, keyHint: 'sk-ant-…', keyUrl: 'https://console.anthropic.com/settings/keys' },
-    openrouter: { label: 'OpenRouter (any model)', base: 'https://openrouter.ai/api/v1', models: { quick: '', default: '', complex: '' }, keyHint: 'sk-or-…', keyUrl: 'https://openrouter.ai/keys' },
-    gemini: { label: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai', models: { quick: '', default: '', complex: '' }, keyHint: 'AIza…', keyUrl: 'https://aistudio.google.com/apikey' },
-    openai: { label: 'OpenAI', base: 'https://api.openai.com/v1', models: { quick: '', default: '', complex: '' }, keyHint: 'sk-…', keyUrl: 'https://platform.openai.com/api-keys' },
-    custom: { label: 'Other (OpenAI-compatible)', base: '', models: { quick: '', default: '', complex: '' }, keyHint: 'key', keyUrl: '' },
+    anthropic: { label: 'Claude (Anthropic)', group: 'paid', protocol: 'anthropic', base: 'https://api.anthropic.com/v1', models: { quick: 'claude-haiku-5-5', default: 'claude-sonnet-5-5', complex: 'claude-opus-5-5' }, keyUrl: 'https://console.anthropic.com/settings/keys', note: 'Paid. Best results for Jarvis.' },
+    gemini: { label: 'Google Gemini', group: 'free', protocol: 'gemini', base: 'https://generativelanguage.googleapis.com/v1beta', models: { quick: 'gemini-2.5-flash-lite', default: 'gemini-2.5-flash', complex: 'gemini-2.5-pro' }, keyUrl: 'https://aistudio.google.com/apikey', note: 'Free tier available.' },
+    groq: { label: 'Groq', group: 'free', protocol: 'openai', base: 'https://api.groq.com/openai/v1', models: { quick: 'llama-3.1-8b-instant', default: 'llama-3.3-70b-versatile', complex: 'llama-3.3-70b-versatile' }, keyUrl: 'https://console.groq.com/keys', note: 'Free tier, very fast.' },
+    openrouter: { label: 'OpenRouter', group: 'free', protocol: 'openai', base: 'https://openrouter.ai/api/v1', models: { quick: 'meta-llama/llama-3.1-8b-instruct:free', default: 'meta-llama/llama-3.3-70b-instruct:free', complex: 'meta-llama/llama-3.3-70b-instruct:free' }, keyUrl: 'https://openrouter.ai/keys', note: 'Hundreds of models, many free.' },
+    cerebras: { label: 'Cerebras', group: 'free', protocol: 'openai', base: 'https://api.cerebras.ai/v1', models: { quick: 'llama3.1-8b', default: 'llama-3.3-70b', complex: 'llama-3.3-70b' }, keyUrl: 'https://cloud.cerebras.ai/', note: 'Free tier available.' },
+    huggingface: { label: 'Hugging Face', group: 'free', protocol: 'openai', base: 'https://router.huggingface.co/v1', models: { quick: 'meta-llama/Llama-3.1-8B-Instruct', default: 'meta-llama/Llama-3.3-70B-Instruct', complex: 'meta-llama/Llama-3.3-70B-Instruct' }, keyUrl: 'https://huggingface.co/settings/tokens', note: 'Free monthly credits. Token starts with hf_.' },
+    sambanova: { label: 'SambaNova', group: 'free', protocol: 'openai', base: 'https://api.sambanova.ai/v1', models: { quick: 'Meta-Llama-3.1-8B-Instruct', default: 'Meta-Llama-3.3-70B-Instruct', complex: 'Meta-Llama-3.3-70B-Instruct' }, keyUrl: 'https://cloud.sambanova.ai/apis', note: 'Free tier available.' },
+    openai: { label: 'OpenAI', group: 'paid', protocol: 'openai', base: 'https://api.openai.com/v1', models: { quick: 'gpt-4o-mini', default: 'gpt-4o', complex: 'gpt-4o' }, keyUrl: 'https://platform.openai.com/api-keys', note: 'Paid.' },
+    deepseek: { label: 'DeepSeek', group: 'paid', protocol: 'openai', base: 'https://api.deepseek.com/v1', models: { quick: 'deepseek-chat', default: 'deepseek-chat', complex: 'deepseek-reasoner' }, keyUrl: 'https://platform.deepseek.com/api_keys', note: 'Paid, very cheap.' },
+    mistral: { label: 'Mistral', group: 'paid', protocol: 'openai', base: 'https://api.mistral.ai/v1', models: { quick: 'mistral-small-latest', default: 'mistral-medium-latest', complex: 'mistral-large-latest' }, keyUrl: 'https://console.mistral.ai/api-keys', note: 'Paid, free experiment tier.' },
+    xai: { label: 'xAI (Grok)', group: 'paid', protocol: 'openai', base: 'https://api.x.ai/v1', models: { quick: 'grok-3-mini', default: 'grok-3-mini', complex: 'grok-3' }, keyUrl: 'https://console.x.ai/', note: 'Paid.' },
+    together: { label: 'Together AI', group: 'paid', protocol: 'openai', base: 'https://api.together.xyz/v1', models: { quick: 'meta-llama/Llama-3.2-3B-Instruct-Turbo', default: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', complex: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' }, keyUrl: 'https://api.together.ai/settings/api-keys', note: 'Paid.' },
+    perplexity: { label: 'Perplexity', group: 'paid', protocol: 'openai', base: 'https://api.perplexity.ai', models: { quick: 'sonar', default: 'sonar', complex: 'sonar-pro' }, keyUrl: 'https://www.perplexity.ai/settings/api', note: 'Paid. Answers with web search.' },
+    fireworks: { label: 'Fireworks AI', group: 'paid', protocol: 'openai', base: 'https://api.fireworks.ai/inference/v1', models: { quick: 'accounts/fireworks/models/llama-v3p1-8b-instruct', default: 'accounts/fireworks/models/llama-v3p3-70b-instruct', complex: 'accounts/fireworks/models/llama-v3p3-70b-instruct' }, keyUrl: 'https://fireworks.ai/account/api-keys', note: 'Paid.' },
+    novita: { label: 'Novita AI', group: 'paid', protocol: 'openai', base: 'https://api.novita.ai/v3/openai', models: { quick: 'meta-llama/llama-3.1-8b-instruct', default: 'meta-llama/llama-3.3-70b-instruct', complex: 'meta-llama/llama-3.3-70b-instruct' }, keyUrl: 'https://novita.ai/settings/key-management', note: 'Paid.' },
+    cohere: { label: 'Cohere', group: 'paid', protocol: 'openai', base: 'https://api.cohere.ai/compatibility/v1', models: { quick: 'command-r', default: 'command-r-plus', complex: 'command-r-plus' }, keyUrl: 'https://dashboard.cohere.com/api-keys', note: 'Free trial key available.' },
+    azure: { label: 'Azure OpenAI', group: 'paid', protocol: 'openai', base: '', models: { quick: 'gpt-4o-mini', default: 'gpt-4o-mini', complex: 'gpt-4o-mini' }, keyUrl: 'https://portal.azure.com/', note: 'Endpoint: https://<resource>.openai.azure.com/openai/deployments/<deployment>', adv: { auth: 'header', authName: 'api-key', query: 'api-version=2024-10-21' } },
+    lmstudio: { label: 'LM Studio (local)', group: 'local', protocol: 'openai', base: 'http://localhost:1234/v1', models: { quick: 'local-model', default: 'local-model', complex: 'local-model' }, keyUrl: 'https://lmstudio.ai/', note: 'Runs on your PC. No key needed.', noKey: true },
+    ollama: { label: 'Ollama (local)', group: 'local', protocol: 'openai', base: 'http://localhost:11434/v1', models: { quick: 'llama3.2', default: 'llama3.2', complex: 'llama3.2' }, keyUrl: 'https://ollama.com/download', note: 'Runs on your PC. No key needed.', noKey: true },
+    custom: { label: 'Custom (any API)', group: 'local', protocol: 'openai', base: '', models: { quick: '', default: '', complex: '' }, keyUrl: '', note: 'Any API: set protocol, endpoint and auth under Advanced.' },
   };
+  const GROUPS = { free: 'Free tier', paid: 'Paid', local: 'Local & custom' };
+  // key prefix → provider (longest first). sk- is shared by several, so it is only a guess.
+  const PREFIXES = [['sk-ant-', 'anthropic'], ['sk-or-', 'openrouter'], ['AIza', 'gemini'], ['gsk_', 'groq'], ['xai-', 'xai'], ['csk-', 'cerebras'], ['hf_', 'huggingface'], ['pplx-', 'perplexity'], ['sk-proj-', 'openai'], ['sk-', 'openai']];
+  const detectProvider = (key) => { const k = String(key || '').trim(); for (const [p, id] of PREFIXES) if (k.startsWith(p)) return id; return null; };
+  const PATHS = { openai: '/chat/completions', anthropic: '/messages', gemini: '/models/{model}:generateContent' };
+
   function aiCfg() {
-    const c = cfg.get('ai', {}) || {}; const id = PROVIDERS[c.provider] ? c.provider : (c.key && !/^sk-ant-/.test(c.key) ? 'custom' : 'anthropic');
-    const P = PROVIDERS[id];
-    return { provider: id, key: c.key || '', base: (c.base || P.base || '').replace(/\/+$/, ''), models: { quick: c.quick || P.models.quick || c.default || P.models.default, default: c.default || P.models.default, complex: c.complex || P.models.complex || c.default || P.models.default } };
+    const c = cfg.get('ai', {}) || {};
+    const id = PROVIDERS[c.provider] ? c.provider : c.provider === 'custom' ? 'custom' : (detectProvider(c.key) || 'anthropic');
+    const P = PROVIDERS[id]; const adv = Object.assign({}, P.adv || {}, c.adv || {});
+    const protocol = (id === 'custom' && adv.protocol) || P.protocol;
+    const def = c.default || P.models.default;
+    return { provider: id, label: P.label, protocol, key: c.key || '', noKey: !!P.noKey, base: (c.base || P.base || '').replace(/\/+$/, ''), adv,
+      models: { quick: c.quick || P.models.quick || def, default: def, complex: c.complex || P.models.complex || def } };
   }
   const fileToB64 = (f) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(f); });
   function normMsgs(input) {
@@ -53,50 +80,102 @@
     for (;;) {
       const { value, done } = await reader.read(); if (done) break;
       buf += dec.decode(value, { stream: true }); let i;
-      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line.startsWith('data:')) { const d = line.slice(5).trim(); if (d && d !== '[DONE]') { try { onData(JSON.parse(d)); } catch (e) {} } } }
+      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line.startsWith('data:')) { const d = line.slice(5).trim(); if (d && d !== '[DONE]') { try { onData(JSON.parse(d)); } catch (e) { if (e && e.code) throw e; } } } }
     }
   }
-  function httpErr(status, body) {
-    const msg = (() => { try { const j = JSON.parse(body); return (j.error && (j.error.message || j.error)) || j.message || body; } catch (e) { return body; } })();
-    if (status === 401 || status === 403) return err('bad_key', 'Your AI key was rejected (' + status + '). Open ⚡ App → AI brain and check it.');
-    if (status === 429) return err('rate_limited', 'Rate limited by your AI provider. Wait a minute and try again.');
-    if (status === 400 && /image/i.test(String(msg))) return err('image_rejected', 'The AI could not read that image.');
-    return err('ai_error', 'AI request failed (' + status + '): ' + String(msg).slice(0, 240));
+  function httpErr(status, body, label) {
+    const msg = (() => { try { const j = JSON.parse(body); const e = Array.isArray(j) ? j[0] && j[0].error : j.error; return (e && (e.message || e)) || j.message || body; } catch (e) { return body; } })();
+    if (status === 401 || status === 403) return err('bad_key', 'Your ' + label + ' key was rejected (' + status + '). Open ⚡ App → AI brain and check it.');
+    if (status === 404) return err('bad_model', label + ' could not find that model or endpoint (404): ' + String(msg).slice(0, 160) + '. Check the model name in ⚡ App → AI brain.');
+    if (status === 429) return err('rate_limited', label + ' is rate limiting you. Wait a minute and try again.');
+    if (status === 400 && /image/i.test(String(msg))) return err('image_rejected', 'This model could not read that image. Try a model with vision.');
+    return err('ai_error', label + ' request failed (' + status + '): ' + String(msg).slice(0, 240));
   }
+  // Build the request for any protocol.
+  function buildRequest(c, model, msgs, images, maxTokens, stream) {
+    const headers = { 'content-type': 'application/json' }; let url = c.base, body;
+    const path = (c.adv.path || PATHS[c.protocol]).replace('{model}', encodeURIComponent(model));
+    if (c.protocol === 'anthropic') {
+      if (images.length) { const last = msgs[msgs.length - 1]; last.content = [...images.map((u) => { const m = /^data:([^;]+);base64,(.*)$/.exec(u) || []; return { type: 'image', source: { type: 'base64', media_type: m[1] || 'image/jpeg', data: m[2] || '' } }; }), { type: 'text', text: String(last.content) }]; }
+      headers['anthropic-version'] = '2023-06-01'; headers['anthropic-dangerous-direct-browser-access'] = 'true';
+      body = { model, max_tokens: maxTokens, messages: msgs, stream };
+      url += path;
+    } else if (c.protocol === 'gemini') {
+      const contents = msgs.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content) }] }));
+      if (images.length) contents[contents.length - 1].parts.unshift(...images.map((u) => { const m = /^data:([^;]+);base64,(.*)$/.exec(u) || []; return { inline_data: { mime_type: m[1] || 'image/jpeg', data: m[2] || '' } }; }));
+      body = { contents, generationConfig: { maxOutputTokens: maxTokens } };
+      url += stream ? path.replace(':generateContent', ':streamGenerateContent') + '?alt=sse' : path;
+    } else {
+      if (images.length) { const last = msgs[msgs.length - 1]; last.content = [{ type: 'text', text: String(last.content) }, ...images.map((u) => ({ type: 'image_url', image_url: { url: u } }))]; }
+      body = { model, messages: msgs, stream, max_tokens: maxTokens };
+      url += path;
+    }
+    // auth
+    const auth = c.adv.auth || (c.protocol === 'openai' ? 'bearer' : 'header');
+    const authName = c.adv.authName || (c.protocol === 'anthropic' ? 'x-api-key' : c.protocol === 'gemini' ? 'x-goog-api-key' : 'authorization');
+    if (c.key && auth === 'bearer') headers.authorization = 'Bearer ' + c.key;
+    else if (c.key && auth === 'header') headers[authName] = c.key;
+    let q = c.adv.query || ''; if (c.key && auth === 'query') q = (q ? q + '&' : '') + encodeURIComponent(authName || 'key') + '=' + encodeURIComponent(c.key);
+    if (q) url += (url.includes('?') ? '&' : '?') + q;
+    for (const line of String(c.adv.headers || '').split('\n')) { const i = line.indexOf(':'); if (i > 0) headers[line.slice(0, i).trim()] = line.slice(i + 1).trim(); }
+    return { url, headers, body };
+  }
+  const textOf = (protocol, j) => protocol === 'anthropic' ? (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('')
+    : protocol === 'gemini' ? ((j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || []).map((p) => p.text || '').join('')
+    : ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '');
+  const deltaOf = (protocol, ev) => protocol === 'anthropic' ? (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' ? ev.delta.text : (ev.type === 'error' ? (() => { throw err('ai_error', (ev.error && ev.error.message) || 'AI stream error'); })() : ''))
+    : protocol === 'gemini' ? textOf('gemini', ev)
+    : ((ev.choices && ev.choices[0] && ev.choices[0].delta && ev.choices[0].delta.content) || '');
+  const isLocal = (u) => /^https?:\/\/(localhost|127\.|\[::1\]|192\.168\.|10\.)/i.test(u);
+  // Some providers block calls from browsers (CORS). Then we relay through this app's own Netlify function.
+  async function viaProxy(req, signal) {
+    const res = await fetch((window.LG_PROXY || '/api/ai-proxy'), { method: 'POST', signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: req.url, method: 'POST', headers: req.headers, body: JSON.stringify(req.body) }) });
+    if (res.status === 404 && !res.headers.get('x-proxy-upstream')) throw err('network', 'Could not reach the AI provider, and the relay is not available here.');
+    return res;
+  }
+
   async function sample(input, opts = {}) {
     const c = aiCfg();
-    if (!c.key) { if (Date.now() - (sample._nag || 0) > 20000) { sample._nag = Date.now(); setTimeout(() => window.LG && window.LG.openPanel && window.LG.openPanel('ai'), 400); } }
-    if (!c.key) throw err('no_key', 'I need an AI key to think. Tap **⚡ App** (top bar) → **AI brain**, paste a Claude API key (or another provider), then ask me again.');
+    if (!c.key && !c.noKey) { if (Date.now() - (sample._nag || 0) > 20000) { sample._nag = Date.now(); setTimeout(() => window.LG && window.LG.openPanel && window.LG.openPanel('ai'), 400); } }
+    if (!c.key && !c.noKey) throw err('no_key', 'I need an AI key to think. Tap **⚡ App** → **AI brain**, paste a key from any provider (Groq and Gemini have free tiers), then ask me again.');
     const tier = ['quick', 'default', 'complex'].includes(opts.modelTier) ? opts.modelTier : 'default';
     const model = c.models[tier];
-    if (!model) throw err('no_model', 'Pick a model name for ' + PROVIDERS[c.provider].label + ' in ⚡ App → AI brain.');
+    if (!model) throw err('no_model', 'Type a model name for ' + c.label + ' in ⚡ App → AI brain.');
+    if (!c.base) throw err('no_base', 'Set the endpoint URL for ' + c.label + ' in ⚡ App → AI brain.');
     const msgs = normMsgs(input); if (!msgs.length) throw err('empty', 'Nothing to send.');
     const images = await Promise.all((opts.images || []).slice(0, 4).map(async (f) => (typeof f === 'string' ? f : await fileToB64(f))));
-    const stream = typeof opts.onText === 'function';
+    const proxied = !!(cfg.get('ai.proxy', {}) || {})[c.provider] && !isLocal(c.base);
+    const stream = typeof opts.onText === 'function' && !proxied;
     const maxTokens = opts.maxTokens || (tier === 'complex' ? 16000 : 8000);
+    const req = buildRequest(c, model, msgs, images, maxTokens, stream);
     let text = '';
-    const tick = (t) => { text += t; if (stream) { try { opts.onText({ text, delta: t }); } catch (e) {} } };
+    const tick = (t) => { if (!t) return; text += t; if (stream) { try { opts.onText({ text, delta: t }); } catch (e) {} } };
     try {
-      if (c.provider === 'anthropic') {
-        if (images.length) { const last = msgs[msgs.length - 1]; last.content = [...images.map((u) => { const m = /^data:([^;]+);base64,(.*)$/.exec(u) || []; return { type: 'image', source: { type: 'base64', media_type: m[1] || 'image/jpeg', data: m[2] || '' } }; }), { type: 'text', text: String(last.content) }]; }
-        const res = await fetch(c.base + '/messages', { method: 'POST', signal: opts.signal, headers: { 'content-type': 'application/json', 'x-api-key': c.key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model, max_tokens: maxTokens, messages: msgs, stream }) });
-        if (!res.ok) throw httpErr(res.status, await res.text());
-        if (stream) await readSSE(res, (ev) => { if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta') tick(ev.delta.text); if (ev.type === 'error') throw err('ai_error', (ev.error && ev.error.message) || 'AI stream error'); });
-        else { const j = await res.json(); text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join(''); }
-      } else {
-        if (!c.base) throw err('no_base', 'Set the provider URL in ⚡ App → AI brain.');
-        if (images.length) { const last = msgs[msgs.length - 1]; last.content = [{ type: 'text', text: String(last.content) }, ...images.map((u) => ({ type: 'image_url', image_url: { url: u } }))]; }
-        const res = await fetch(c.base + '/chat/completions', { method: 'POST', signal: opts.signal, headers: { 'content-type': 'application/json', authorization: 'Bearer ' + c.key }, body: JSON.stringify({ model, messages: msgs, stream, max_tokens: maxTokens }) });
-        if (!res.ok) throw httpErr(res.status, await res.text());
-        if (stream) await readSSE(res, (ev) => { const d = ev.choices && ev.choices[0] && ev.choices[0].delta; if (d && d.content) tick(d.content); });
-        else { const j = await res.json(); text = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || ''; }
+      let res;
+      if (proxied) res = await viaProxy(req, opts.signal);
+      else {
+        try { res = await fetch(req.url, { method: 'POST', signal: opts.signal, headers: req.headers, body: JSON.stringify(req.body) }); }
+        catch (e) {
+          if (e && e.name === 'AbortError') throw e;
+          if (navigator.onLine === false || isLocal(c.base)) throw e;
+          // likely blocked by CORS: remember and retry through the relay (no streaming)
+          cfg.set('ai.proxy', Object.assign({}, cfg.get('ai.proxy', {}) || {}, { [c.provider]: true }));
+          const req2 = buildRequest(c, model, normMsgs(input), images, maxTokens, false);
+          res = await viaProxy(req2, opts.signal);
+          if (!res.ok) throw httpErr(res.status, await res.text(), c.label);
+          text = textOf(c.protocol, await res.json()); if (typeof opts.onText === 'function') try { opts.onText({ text, delta: text }); } catch (x) {}
+          return { text, route: 'proxy' };
+        }
       }
+      if (!res.ok) throw httpErr(res.status, await res.text(), c.label);
+      if (stream) await readSSE(res, (ev) => tick(deltaOf(c.protocol, ev)));
+      else { text = textOf(c.protocol, await res.json()); if (proxied && typeof opts.onText === 'function') try { opts.onText({ text, delta: text }); } catch (x) {} }
     } catch (e) {
       if (e && (e.name === 'AbortError' || (opts.signal && opts.signal.aborted))) throw err('cancelled', '', { text });
       if (e && e.code) { if (text && !e.partial) e.partial = text; throw e; }
-      throw err('network', navigator.onLine === false ? 'You are offline. Connect to the internet and try again.' : 'Could not reach the AI provider (' + (e && e.message) + ').');
+      throw err('network', navigator.onLine === false ? 'You are offline. Connect to the internet and try again.' : isLocal(c.base) ? 'Could not reach ' + c.label + ' at ' + c.base + '. Is it running, with CORS allowed?' : 'Could not reach ' + c.label + ' (' + (e && e.message) + ').');
     }
-    return { text };
+    return { text, route: proxied ? 'proxy' : 'direct' };
   }
   function parseLoose(t) {
     const tries = [t]; const f = String(t).match(/```(?:json)?\s*([\s\S]*?)```/); if (f) tries.push(f[1]);
@@ -109,7 +188,7 @@
     const inp = typeof input === 'string' ? input + tail : normMsgs(input).map((m, i, a) => (i === a.length - 1 && typeof m.content === 'string' ? Object.assign({}, m, { content: m.content + tail }) : m));
     const r = await sample(inp, Object.assign({}, opts, { onText: undefined }));
     const v = parseLoose(r.text);
-    if (v === undefined) throw err('bad_json', 'The AI reply was not valid JSON. Try again.', { text: r.text });
+    if (v === undefined) throw err('bad_json', 'The AI reply was not valid JSON. Try again (or pick a stronger model).', { text: r.text });
     return v;
   };
   sample.limits = async () => ({ images: true });
@@ -265,7 +344,7 @@
   /* make sure the app's "cloud job" buttons are enabled: it checks meta/refresh for trigger ids */
   store.ready.then(() => { const r = store.get('meta/refresh'); if (!r || !r.triggerId || !r.courseTriggerId) store.db.doc('meta/refresh').set(Object.assign({}, r || {}, { triggerId: (r && r.triggerId) || 'gh-daily', courseTriggerId: (r && r.courseTriggerId) || 'gh-courses' })); });
 
-  window.LG = Object.assign(window.LG || {}, { cfg, bus, store, Sync, GH, PROVIDERS, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
+  window.LG = Object.assign(window.LG || {}, { cfg, bus, store, Sync, GH, PROVIDERS, GROUPS, detectProvider, aiCfg, setAi: (o) => cfg.set('ai', Object.assign({}, cfg.get('ai', {}), o)), sample, requestFeature: (...a) => GH.requestFeature(...a), version: window.LG_VERSION || 'dev' });
 
   Sync.handleRedirect().finally(() => Sync.soon(400));
 })();

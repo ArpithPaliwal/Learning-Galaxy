@@ -106,7 +106,7 @@
     el.innerHTML = `<p class="lg-note">This is your Learning Galaxy as a real app: it works offline, installs to your home screen, and keeps its data on this device. Set up the pieces below once.</p>
       <div class="lg-builds">
         ${row(standalone(), 'Installed as an app', standalone() ? 'Running from your home screen.' : installEvt ? 'Tap Install to add it to this device.' : 'In your browser menu choose “Install app” / “Add to Home screen”.', '')}
-        ${row(!!ai.key, 'AI brain', ai.key ? LG.PROVIDERS[ai.provider].label + ' · ' + esc(ai.models.default) : 'Jarvis, courses and quizzes need an AI key.', 'ai')}
+        ${row(!!(ai.key || ai.noKey), 'AI brain', ai.key || ai.noKey ? esc(ai.label) + ' · ' + esc(ai.models.default) : 'Jarvis, courses and quizzes need an AI key (Groq and Gemini are free).', 'ai')}
         ${row(LG.Sync.signedIn(), 'Cloud sync', LG.Sync.signedIn() ? 'Signed in as ' + esc((LG.Sync.session().user || {}).email || '') + (s.last ? ' · last sync ' + new Date(s.last).toLocaleTimeString() : '') : LG.Sync.configured() ? 'Sign in to sync phone, tablet and PC.' : 'Optional: sync across devices with Supabase.', 'sync')}
         ${row(LG.GH.hasToken(), 'Claude builder', LG.GH.hasToken() ? 'Jarvis can file and track feature builds.' : 'Ask for a feature and Claude builds and ships it.', 'build')}
         ${row(LG.store.count() > 0, 'Your data', LG.store.count() + ' records on this device', 'data')}
@@ -119,21 +119,41 @@
   }
 
   function ai(el) {
-    const c = LG.cfg.get('ai', {}) || {}; const cur = LG.aiCfg(); const P = LG.PROVIDERS[cur.provider];
-    el.innerHTML = `<p class="lg-note">Jarvis, course drafting, quizzes and teach-back use this key. It is stored only on this device and sent only to the provider you pick.</p>
-      <div class="field"><span class="label">Provider</span><select class="inp" id="aiP">${Object.entries(LG.PROVIDERS).map(([k, p]) => `<option value="${k}" ${k === cur.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select></div>
-      <div class="field"><span class="label">API key</span><input class="inp" id="aiK" type="password" autocomplete="off" placeholder="${esc(P.keyHint)}" value="${esc(c.key || '')}">${P.keyUrl ? `<a class="faint" style="font-size:12.5px" href="${P.keyUrl}" target="_blank" rel="noopener">Get a key ↗</a>` : ''}</div>
-      ${cur.provider === 'anthropic' ? '' : `<div class="field"><span class="label">Endpoint URL</span><input class="inp" id="aiB" placeholder="https://…/v1" value="${esc(c.base || P.base)}"></div>`}
+    const c = LG.cfg.get('ai', {}) || {}; const cur = LG.aiCfg(); const P = LG.PROVIDERS[cur.provider]; const adv = Object.assign({}, P.adv || {}, c.adv || {});
+    const opts = Object.entries(LG.GROUPS).map(([g, gl]) => `<optgroup label="${esc(gl)}">${Object.entries(LG.PROVIDERS).filter(([, p]) => p.group === g).map(([k, p]) => `<option value="${k}" ${k === cur.provider ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</optgroup>`).join('');
+    const showBase = cur.provider === 'custom' || cur.provider === 'azure' || P.group === 'local' || !!c.base;
+    el.innerHTML = `<p class="lg-note">Jarvis, course drafting, quizzes and teach-back use this. Works with any provider: paste a key and it is recognised automatically. The key stays on this device and goes only to that provider.</p>
+      <div class="field"><span class="label">Provider</span><select class="inp" id="aiP">${opts}</select><span class="faint" style="font-size:12.5px">${esc(P.note || '')}${P.keyUrl ? ` · <a href="${P.keyUrl}" target="_blank" rel="noopener">Get a key ↗</a>` : ''}</span></div>
+      ${P.noKey ? '' : `<div class="field"><span class="label">API key</span><input class="inp" id="aiK" type="password" autocomplete="off" placeholder="Paste your ${esc(P.label)} key" value="${esc(c.key || '')}"><span class="faint" id="aiDet" style="font-size:12.5px"></span></div>`}
       <div class="lg-two"><div class="field"><span class="label">Model (normal)</span><input class="inp" id="aiM" placeholder="${esc(P.models.default || 'model name')}" value="${esc(c.default || '')}"></div>
       <div class="field"><span class="label">Model (deep think)</span><input class="inp" id="aiC" placeholder="${esc(P.models.complex || 'same as normal')}" value="${esc(c.complex || '')}"></div></div>
       <div class="field"><span class="label">Model (quick / eco)</span><input class="inp" id="aiQ" placeholder="${esc(P.models.quick || 'same as normal')}" value="${esc(c.quick || '')}"></div>
+      <details ${showBase ? 'open' : ''}><summary class="label" style="cursor:pointer">Endpoint &amp; advanced</summary><div class="lg-sec" style="margin-top:10px">
+        <div class="field"><span class="label">Endpoint URL</span><input class="inp" id="aiB" placeholder="${esc(P.base || 'https://…/v1')}" value="${esc(c.base || '')}"></div>
+        ${cur.provider === 'custom' ? `<div class="lg-two"><div class="field"><span class="label">Protocol</span><select class="inp" id="aiPr">${[['openai', 'OpenAI-compatible'], ['anthropic', 'Anthropic'], ['gemini', 'Gemini']].map(([v, l]) => `<option value="${v}" ${(adv.protocol || 'openai') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div class="field"><span class="label">Auth</span><select class="inp" id="aiAu">${[['bearer', 'Bearer token'], ['header', 'Header'], ['query', 'Query param'], ['none', 'None']].map(([v, l]) => `<option value="${v}" ${(adv.auth || 'bearer') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+          <div class="lg-two"><div class="field"><span class="label">Header / param name</span><input class="inp" id="aiAn" placeholder="e.g. api-key" value="${esc(adv.authName || '')}"></div><div class="field"><span class="label">Path</span><input class="inp" id="aiPa" placeholder="/chat/completions" value="${esc(adv.path || '')}"></div></div>
+          <div class="field"><span class="label">Extra query</span><input class="inp" id="aiQs" placeholder="api-version=2024-10-21" value="${esc(adv.query || '')}"></div>
+          <div class="field"><span class="label">Extra headers (one per line)</span><textarea class="inp" id="aiH" rows="2" placeholder="X-Title: Learning Galaxy">${esc(adv.headers || '')}</textarea></div>` : ''}
+        ${(LG.cfg.get('ai.proxy', {}) || {})[cur.provider] ? `<div class="row"><span class="faint" style="font-size:12.5px">Using the app's relay for ${esc(P.label)} (direct calls were blocked).</span><button class="btn small ghost" id="aiNp">Try direct again</button></div>` : ''}
+      </div></details>
       <div class="row"><button class="btn primary" id="aiSave">Save</button><button class="btn" id="aiTest">Test</button><span class="faint" id="aiOut" style="font-size:13px"></span></div>`;
-    const read = () => ({ provider: $('#aiP', el).value, key: $('#aiK', el).value.trim(), base: $('#aiB', el) ? $('#aiB', el).value.trim() : '', default: $('#aiM', el).value.trim(), complex: $('#aiC', el).value.trim(), quick: $('#aiQ', el).value.trim() });
-    $('#aiP', el).onchange = () => { LG.cfg.set('ai', Object.assign(read(), { base: '' })); draw(); };
+    const v = (id) => { const n = $(id, el); return n ? n.value.trim() : undefined; };
+    const read = () => {
+      const o = { provider: $('#aiP', el).value, key: v('#aiK') ?? c.key ?? '', base: v('#aiB') || '', default: v('#aiM'), complex: v('#aiC'), quick: v('#aiQ') };
+      if ($('#aiPr', el)) o.adv = { protocol: v('#aiPr'), auth: v('#aiAu'), authName: v('#aiAn'), path: v('#aiPa'), query: v('#aiQs'), headers: $('#aiH', el).value };
+      return o;
+    };
+    $('#aiP', el).onchange = () => { LG.cfg.set('ai', Object.assign(read(), { base: '', default: '', complex: '', quick: '', adv: undefined })); draw(); };
+    const k = $('#aiK', el);
+    if (k) k.oninput = () => { const d = LG.detectProvider(k.value); const out = $('#aiDet', el);
+      if (d && d !== $('#aiP', el).value) { out.innerHTML = `Looks like a <b>${esc(LG.PROVIDERS[d].label)}</b> key. <a href="#" id="aiSw">Switch</a>`; $('#aiSw', el).onclick = (e) => { e.preventDefault(); LG.cfg.set('ai', { provider: d, key: k.value.trim() }); draw(); toast('Switched to ' + LG.PROVIDERS[d].label + '.'); }; }
+      else out.textContent = ''; };
+    $('#aiNp', el) && ($('#aiNp', el).onclick = () => { const p = Object.assign({}, LG.cfg.get('ai.proxy', {}) || {}); delete p[cur.provider]; LG.cfg.set('ai.proxy', p); draw(); });
     $('#aiSave', el).onclick = () => { LG.cfg.set('ai', read()); toast('AI settings saved.'); draw(); };
     $('#aiTest', el).onclick = async () => {
       LG.cfg.set('ai', read()); const o = $('#aiOut', el); o.textContent = 'Testing…';
-      try { const r = await LG.sample('Reply with exactly: Online.', { modelTier: 'quick', maxTokens: 20 }); o.textContent = '✓ ' + r.text.trim().slice(0, 60); }
+      try { const r = await LG.sample('Reply with exactly: Online.', { modelTier: 'default', maxTokens: 20 }); o.textContent = '✓ ' + r.text.trim().slice(0, 50) + (r.route === 'proxy' ? ' (via relay)' : ''); }
       catch (e) { o.textContent = '✕ ' + (e.text || e.message); }
     };
   }
@@ -213,7 +233,7 @@
   /* ---------- first run ---------- */
   LG.store.ready.then(() => {
     mountButton();
-    if (!LG.store.count() || !LG.aiCfg().key) setTimeout(() => { if (!document.querySelector('.modal:not([hidden])')) openPanel(LG.store.count() > 1 ? 'ai' : 'home'); }, 900);
+    if (!LG.store.count() || !(LG.aiCfg().key || LG.aiCfg().noKey)) setTimeout(() => { if (!document.querySelector('.modal:not([hidden])')) openPanel(LG.store.count() > 1 ? 'ai' : 'home'); }, 900);
   });
   if (document.readyState !== 'loading') mountButton(); else document.addEventListener('DOMContentLoaded', mountButton);
 

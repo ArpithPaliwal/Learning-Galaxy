@@ -120,3 +120,47 @@ test('feature request footer matches the Expenses app (builder, model, when)', a
   await win.LG.requestFeature('Idea', 'y', { builder: 'manual' });
   assert.match(decodeURIComponent(opened[1]), /Builder: Just save it\n/);
 });
+
+test('Groq key: detected, OpenAI-compatible call with bearer auth and its default model', async () => {
+  let req;
+  const { win } = boot({ ai: { key: 'gsk_abc' }, fetch: async (u, o) => { req = { u, o, body: JSON.parse(o.body) }; return jsonRes({ choices: [{ message: { content: 'hi' } }] }); } });
+  assert.equal(win.LG.detectProvider('gsk_abc'), 'groq');
+  const s = await win.claude.use('sample');
+  assert.equal((await s('hello')).text, 'hi');
+  assert.equal(req.u, 'https://api.groq.com/openai/v1/chat/completions');
+  assert.equal(req.o.headers.authorization, 'Bearer gsk_abc');
+  assert.equal(req.body.model, 'llama-3.3-70b-versatile');
+});
+
+test('Gemini uses generateContent with x-goog-api-key and model roles', async () => {
+  let req;
+  const { win } = boot({ ai: { provider: 'gemini', key: 'AIzaX' }, fetch: async (u, o) => { req = { u, o, body: JSON.parse(o.body) }; return jsonRes({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }); } });
+  const s = await win.claude.use('sample');
+  const r = await s([{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }, { role: 'user', content: 'c' }]);
+  assert.equal(r.text, 'ok');
+  assert.equal(req.u, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent');
+  assert.equal(req.o.headers['x-goog-api-key'], 'AIzaX');
+  assert.deepEqual(req.body.contents.map((c) => c.role), ['user', 'model', 'user']);
+});
+
+test('a browser-blocked provider falls back to the app relay and remembers it', async () => {
+  const calls = [];
+  const { win } = boot({ ai: { provider: 'cerebras', key: 'csk-1' }, fetch: async (u, o) => {
+    calls.push(u);
+    if (u.startsWith('https://api.cerebras.ai')) throw new TypeError('Failed to fetch');
+    const inner = JSON.parse(o.body); assert.equal(inner.url, 'https://api.cerebras.ai/v1/chat/completions'); assert.equal(inner.headers.authorization, 'Bearer csk-1');
+    return { ok: true, status: 200, headers: { get: () => '1' }, json: async () => ({ choices: [{ message: { content: 'relayed' } }] }), text: async () => '' };
+  } });
+  const s = await win.claude.use('sample');
+  const r = await s('x');
+  assert.equal(r.text, 'relayed'); assert.equal(r.route, 'proxy');
+  assert.deepEqual(calls, ['https://api.cerebras.ai/v1/chat/completions', '/api/ai-proxy']);
+  await s('again'); assert.equal(calls[2], '/api/ai-proxy', 'remembers to use the relay');
+});
+
+test('local providers need no key', async () => {
+  let u0;
+  const { win } = boot({ ai: { provider: 'ollama' }, fetch: async (u) => { u0 = u; return jsonRes({ choices: [{ message: { content: 'local' } }] }); } });
+  const s = await win.claude.use('sample');
+  assert.equal((await s('x')).text, 'local'); assert.equal(u0, 'http://localhost:11434/v1/chat/completions');
+});
