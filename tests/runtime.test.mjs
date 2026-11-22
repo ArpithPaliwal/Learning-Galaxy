@@ -164,3 +164,18 @@ test('local providers need no key', async () => {
   const s = await win.claude.use('sample');
   assert.equal((await s('x')).text, 'local'); assert.equal(u0, 'http://localhost:11434/v1/chat/completions');
 });
+
+test('a Groq key saved while "Claude" is selected still goes to Groq', async () => {
+  let u0;
+  const { win } = boot({ ai: { provider: 'anthropic', key: ' gsk_real ', default: 'claude-x' }, fetch: async (u, o) => { u0 = { u, auth: o.headers.authorization, model: JSON.parse(o.body).model }; return jsonRes({ choices: [{ message: { content: 'ok' } }] }); } });
+  assert.equal(win.LG.aiCfg().provider, 'groq');
+  const s = await win.claude.use('sample');
+  assert.equal((await s('x')).text, 'ok');
+  assert.deepEqual(JSON.parse(JSON.stringify(u0)), { u: 'https://api.groq.com/openai/v1/chat/completions', auth: 'Bearer gsk_real', model: 'llama-3.3-70b-versatile' });
+});
+
+test('a rejected key shows the provider message', async () => {
+  const { win } = boot({ ai: { provider: 'groq', key: 'gsk_bad' }, fetch: async () => jsonRes({ error: { message: 'Invalid API Key' } }, 401) });
+  const s = await win.claude.use('sample');
+  await assert.rejects(s('x'), (e) => e.code === 'bad_key' && /Invalid API Key/.test(e.text) && /Groq/.test(e.text));
+});

@@ -140,7 +140,9 @@
       <div class="row"><button class="btn primary" id="aiSave">Save</button><button class="btn" id="aiTest">Test</button><span class="faint" id="aiOut" style="font-size:13px"></span></div>`;
     const v = (id) => { const n = $(id, el); return n ? n.value.trim() : undefined; };
     const read = () => {
-      const o = { provider: $('#aiP', el).value, key: v('#aiK') ?? c.key ?? '', base: v('#aiB') || '', default: v('#aiM'), complex: v('#aiC'), quick: v('#aiQ') };
+      const key0 = String(v('#aiK') ?? c.key ?? '').replace(/^Bearers+/i, ''); const p0 = $('#aiP', el).value; const d0 = LG.detectProvider(key0);
+      const auto = d0 && d0 !== 'openai' && d0 !== p0 && p0 !== 'custom' && LG.PROVIDERS[p0].group !== 'local';
+      const o = { provider: auto ? d0 : p0, key: key0, base: v('#aiB') || '', default: v('#aiM'), complex: v('#aiC'), quick: v('#aiQ') };
       if ($('#aiPr', el)) o.adv = { protocol: v('#aiPr'), auth: v('#aiAu'), authName: v('#aiAn'), path: v('#aiPa'), query: v('#aiQs'), headers: $('#aiH', el).value };
       return o;
     };
@@ -150,9 +152,9 @@
       if (d && d !== $('#aiP', el).value) { out.innerHTML = `Looks like a <b>${esc(LG.PROVIDERS[d].label)}</b> key. <a href="#" id="aiSw">Switch</a>`; $('#aiSw', el).onclick = (e) => { e.preventDefault(); LG.cfg.set('ai', { provider: d, key: k.value.trim() }); draw(); toast('Switched to ' + LG.PROVIDERS[d].label + '.'); }; }
       else out.textContent = ''; };
     $('#aiNp', el) && ($('#aiNp', el).onclick = () => { const p = Object.assign({}, LG.cfg.get('ai.proxy', {}) || {}); delete p[cur.provider]; LG.cfg.set('ai.proxy', p); draw(); });
-    $('#aiSave', el).onclick = () => { LG.cfg.set('ai', read()); toast('AI settings saved.'); draw(); };
+    $('#aiSave', el).onclick = () => { const o = read(); LG.cfg.set('ai', o); toast(o.provider !== $('#aiP', el).value ? 'Saved. That is a ' + LG.PROVIDERS[o.provider].label + ' key, so I switched to ' + LG.PROVIDERS[o.provider].label + '.' : 'AI settings saved.'); draw(); };
     $('#aiTest', el).onclick = async () => {
-      LG.cfg.set('ai', read()); const o = $('#aiOut', el); o.textContent = 'Testing…';
+      const rd = read(); LG.cfg.set('ai', rd); if (rd.provider !== $('#aiP', el).value) { draw(); toast('That is a ' + LG.PROVIDERS[rd.provider].label + ' key, so I switched to it. Testing…'); setTimeout(() => { const t = document.getElementById('aiTest'); t && t.click(); }, 300); return; } const o = $('#aiOut', el); o.textContent = 'Testing…';
       try { const r = await LG.sample('Reply with exactly: Online.', { modelTier: 'default', maxTokens: 20 }); o.textContent = '✓ ' + r.text.trim().slice(0, 50) + (r.route === 'proxy' ? ' (via relay)' : ''); }
       catch (e) { o.textContent = '✕ ' + (e.text || e.message); }
     };

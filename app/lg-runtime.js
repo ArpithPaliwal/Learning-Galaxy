@@ -57,14 +57,21 @@
   const detectProvider = (key) => { const k = String(key || '').trim(); for (const [p, id] of PREFIXES) if (k.startsWith(p)) return id; return null; };
   const PATHS = { openai: '/chat/completions', anthropic: '/messages', gemini: '/models/{model}:generateContent' };
 
+  // prefixes owned by exactly one provider: such a key wins over a mismatched provider choice
+  const SURE = new Set(['anthropic', 'openrouter', 'gemini', 'groq', 'xai', 'cerebras', 'huggingface', 'perplexity']);
   function aiCfg() {
     const c = cfg.get('ai', {}) || {};
-    const id = PROVIDERS[c.provider] ? c.provider : c.provider === 'custom' ? 'custom' : (detectProvider(c.key) || 'anthropic');
-    const P = PROVIDERS[id]; const adv = Object.assign({}, P.adv || {}, c.adv || {});
+    const key = String(c.key || '').trim().replace(/^Bearer\s+/i, '');
+    const det = detectProvider(key);
+    let id = PROVIDERS[c.provider] ? c.provider : (det || 'anthropic');
+    if (det && SURE.has(det) && id !== det && id !== 'custom' && PROVIDERS[id].group !== 'local') id = det; // e.g. a gsk_ key while "Claude" is selected → Groq
+    const P = PROVIDERS[id]; const switched = !!c.provider && id !== c.provider;
+    const mine = (k) => (switched ? '' : c[k]); // settings typed for another provider don't carry over
+    const adv = Object.assign({}, P.adv || {}, switched ? {} : (c.adv || {}));
     const protocol = (id === 'custom' && adv.protocol) || P.protocol;
-    const def = c.default || P.models.default;
-    return { provider: id, label: P.label, protocol, key: c.key || '', noKey: !!P.noKey, base: (c.base || P.base || '').replace(/\/+$/, ''), adv,
-      models: { quick: c.quick || P.models.quick || def, default: def, complex: c.complex || P.models.complex || def } };
+    const def = mine('default') || P.models.default;
+    return { provider: id, label: P.label, protocol, key, noKey: !!P.noKey, base: (mine('base') || P.base || '').replace(/\/+$/, ''), adv,
+      models: { quick: mine('quick') || P.models.quick || def, default: def, complex: mine('complex') || P.models.complex || def } };
   }
   const fileToB64 = (f) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(f); });
   function normMsgs(input) {
@@ -85,7 +92,8 @@
   }
   function httpErr(status, body, label) {
     const msg = (() => { try { const j = JSON.parse(body); const e = Array.isArray(j) ? j[0] && j[0].error : j.error; return (e && (e.message || e)) || j.message || body; } catch (e) { return body; } })();
-    if (status === 401 || status === 403) return err('bad_key', 'Your ' + label + ' key was rejected (' + status + '). Open ⚡ App → AI brain and check it.');
+    if (/^(forbidden|host not allowed|https only|bad url)$/i.test(String(msg))) return err('relay', 'The app relay refused the request (' + msg + '). Open the app from its main address and try again.');
+    if (status === 401 || status === 403) return err('bad_key', label + ' said: “' + String(msg).slice(0, 160) + '” (' + status + '). Check the key in ⚡ App → AI brain, and that it is a ' + label + ' key.');
     if (status === 404) return err('bad_model', label + ' could not find that model or endpoint (404): ' + String(msg).slice(0, 160) + '. Check the model name in ⚡ App → AI brain.');
     if (status === 429) return err('rate_limited', label + ' is rate limiting you. Wait a minute and try again.');
     if (status === 400 && /image/i.test(String(msg))) return err('image_rejected', 'This model could not read that image. Try a model with vision.');
