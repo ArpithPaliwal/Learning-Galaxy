@@ -233,3 +233,28 @@ details.acc{border-radius:var(--r-md);background:var(--panel);overflow:hidden}
 
 /* ---------- motion ---------- */
 @media (prefers-reduced-motion: reduce){.btn:active{transform:none}}
+
+/* ---------- fixes after screenshot review ---------- */
+/* phone: a backdrop-filter on .top would trap the fixed bottom tab bar inside the header */
+@media (max-width:640px){
+  .top{backdrop-filter:none!important}
+  .hello{flex-direction:column;align-items:stretch}
+  .hello .row{margin-inline:0;padding-inline:0;max-width:100%}
+  .hero-stats{flex-direction:column;align-items:stretch}
+}
+/* labels in sentence case everywhere */
+.dreac-l,.top .right .lg-appbtn,.g-ctrl .iconbtn,.rd-filters button,.subtabs button{text-transform:none!important;letter-spacing:0!important;font-family:var(--f-body)!important}
+.dreac-l{font-size:12.5px;font-weight:600;color:var(--fg-2)}
+.top .right .lg-appbtn{font-weight:600;font-size:13px;color:var(--fg)}
+/* sidebar: give the icon buttons words */
+@media (min-width:1101px){
+  .top .right .iconbtn{gap:10px;padding:0 14px;font:600 14px var(--f-body);color:var(--fg-2);display:flex;align-items:center}
+  #lgThemeBtn::after{content:"Appearance"}
+  #cmdBtn::after{content:"Search & commands"}
+  #settingsBtn::after{content:"Settings"}
+  .top .right .clock{font-size:12.5px}
+}
+/* tablet: keep the top bar on one line */
+@media (min-width:641px) and (max-width:1100px){ .clock{display:none} .top .right .lg-appbtn .t{display:none} .top{flex-wrap:nowrap} .brand span{display:none} }
+@media (max-width:640px){ .stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:8px} .stat{min-width:0;padding:10px 12px} .stat b{font-size:20px} .stat span{font-size:11.5px} html,body{overflow-x:hidden} }
+.dreac-l span::before{box-shadow:0 0 0 1px var(--line-2)}
