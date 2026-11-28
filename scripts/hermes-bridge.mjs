@@ -68,7 +68,7 @@ async function runHermes(job, onDelta) {
   try {
     const r = await fetch(API + '/chat/completions', { method: 'POST', signal: ctl.signal,
       headers: { authorization: 'Bearer ' + HERMES_API_KEY, 'content-type': 'application/json', 'X-Hermes-Session-Key': 'learning-galaxy-jarvis', 'Idempotency-Key': 'lg-' + job.id },
-      body: JSON.stringify({ model: 'hermes-agent', stream: true, messages }) });
+      body: JSON.stringify({ model: process.env.HERMES_MODEL || 'hermes-agent', ...(process.env.HERMES_PROVIDER ? { provider: process.env.HERMES_PROVIDER } : {}), stream: true, messages }) });
     if (!r.ok) throw new Error('Hermes API ' + r.status + ': ' + (await r.text()).slice(0, 300));
     let text = '', buf = '', finish = '';
     const dec = new TextDecoder();
