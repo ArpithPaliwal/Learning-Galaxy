@@ -969,10 +969,16 @@ function resourceCourseLocations(url, videoId=''){
   for(const c of C('courses').values())for(const [mi,m] of (c.modules||[]).entries())if((m.videos||[]).some(matches))found.push({course:c.title||c.ask||'Untitled course',module:m.t||'Module '+(mi+1)});
   return found;
 }
-function saveResourceButton(title, url, kind='resource', videoId=''){
-  const u=safeUrl(url); if(!u)return '';
-  const kindName=(kind==='video'||kind==='playlist'||ytId(u)||/\.(?:mp4|webm|m3u8)(?:$|\?)/i.test(u))?'video':'resource';
-  return `<button class="btn small ghost" data-save-resource data-save-title="${esc(title||u)}" data-save-url="${esc(u)}" data-save-kind="${kindName}" data-save-video-id="${esc(videoId||ytId(u))}">＋ Save to…</button>`;
+function newsCourseFlag(places){
+  if(!places.length)return '<span class="pill" title="Not present in any course">○ Not in course</span>';
+  const all=places.map(p=>p.course+' → '+p.module), label=all[0]+(all.length>1?' +'+(all.length-1):'');
+  return `<span class="pill" title="Present in: ${esc(all.join('; '))}" aria-label="Present in: ${esc(all.join('; '))}">✓ In: ${esc(label)}</span>`;
+}
+function saveResourceButton(title, url, kind='resource', videoId='', summary=''){
+  const u=safeUrl(url); if(!u&&!['path','path-step'].includes(kind))return '';
+  if(!u&&!String(title||'').trim())return '';
+  const kindName=['path','path-step'].includes(kind)?kind:(kind==='video'||kind==='playlist'||ytId(u)||/\.(?:mp4|webm|m3u8)(?:$|\?)/i.test(u))?'video':'resource';
+  return `<button class="btn small ghost" data-save-resource data-save-title="${esc(title||u)}" data-save-url="${esc(u)}" data-save-kind="${kindName}" data-save-video-id="${esc(videoId||ytId(u))}" data-save-summary="${esc(summary||'')}">＋ Save to…</button>`;
 }
 function resourceThumbnail(url, videoId, title, kind='resource'){
   const u=safeUrl(url); if(!u)return '';
@@ -983,7 +989,7 @@ function resourceThumbnail(url, videoId, title, kind='resource'){
 function openResourceSave(resource){
   const courses=activeCourses(), initialCourse=courses[0]?.id||'';
   const moduleOptions=c=>{const ms=c?.modules||[];return ms.map((m,i)=>`<option value="${esc(m.id||String(i))}">${esc(m.t||'Module '+(i+1))}</option>`).join('')+'<option value="__new">＋ New module</option>';};
-  openModal(`<h3>Save resource</h3><p class="muted" style="margin:6px 0 14px">${esc(resource.title)}</p>
+  openModal(`<h3>Save resource</h3><p class="muted" style="margin:6px 0 14px">${esc(resource.title)}${resource.summary?`<br><span class="faint">${esc(resource.summary)}</span>`:''}</p>
     <div class="field"><span class="label">Save to</span><select class="inp" data-save-destination><option value="bucket">My Buckets</option><option value="course">A course</option></select></div>
     <div data-save-course-fields hidden><div class="field"><span class="label">Course</span><select class="inp" data-save-course>${courses.map(c=>`<option value="${esc(c.id)}" ${c.id===initialCourse?'selected':''}>${esc(c.title||c.ask||'Untitled course')}</option>`).join('')}</select></div>
       <div class="field"><span class="label">Place it in</span><select class="inp" data-save-module>${moduleOptions(courses[0])}</select></div>
@@ -997,7 +1003,7 @@ function openResourceSave(resource){
       $('[data-save-confirm]').onclick=async()=>{
         if(dest.value==='bucket'){
           const kind=$('[data-save-bucket-kind]').value;
-          await put('buckets',`saved-${slug(resource.title)}-${rid()}`,{title:resource.title,url:resource.url,videoId:resource.videoId||'',kind,notes:'',resources:[],source:'manual',created:nowIso(),updated:nowIso()});
+          await put('buckets',`saved-${slug(resource.title)}-${rid()}`,{title:resource.title,url:resource.url,videoId:resource.videoId||'',kind,notes:resource.summary||'',resources:[],source:'manual',created:nowIso(),updated:nowIso()});
           closeModal();toast('Saved to My Buckets.');return;
         }
         const c=C('courses').get(courseSel.value); if(!c){toast('Choose a course first.');return;}
@@ -1007,13 +1013,13 @@ function openResourceSave(resource){
           modules.push({id:'m'+rid(),t,goal:'',videos:[]});mi=modules.length-1;
         }
         if(mi<0){toast('Choose where in the course to place it.');return;}
-        const lesson={key:'v'+rid(),q:'',title:resource.title,id:resource.videoId||ytId(resource.url)||undefined,url:resource.url,min:15,done:false,kind:resource.kind||'resource'};
+        const lesson={key:'v'+rid(),q:'',title:resource.title,id:resource.videoId||ytId(resource.url)||undefined,url:resource.url,summary:resource.summary||'',min:15,done:false,kind:resource.kind||'resource'};
         modules[mi]=Object.assign({},modules[mi],{videos:[...(modules[mi].videos||[]),lesson]});
         await patch('courses',c.id,{modules,status:'ready',touched:nowIso()});closeModal();toast('Added to '+(c.title||'course')+'.');
       };
     });
 }
-document.addEventListener('click',e=>{const b=e.target.closest('[data-save-resource]');if(b)openResourceSave({title:b.dataset.saveTitle,url:b.dataset.saveUrl,kind:b.dataset.saveKind,videoId:b.dataset.saveVideoId});});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-save-resource]');if(b)openResourceSave({title:b.dataset.saveTitle,url:b.dataset.saveUrl,kind:b.dataset.saveKind,videoId:b.dataset.saveVideoId,summary:b.dataset.saveSummary});});
 const fmtMin = m => { m = Math.round(m||0); return m < 60 ? m+' min' : Math.floor(m/60)+' h'+(m%60 ? ' '+(m%60)+' min' : ''); };
 const LS = { get(k,d){ try{ const v = localStorage.getItem('lg3.'+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem('lg3.'+k, JSON.stringify(v)); }catch(e){} } };
 let toastT; function toast(m, ms=3200){ const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
@@ -1407,7 +1413,7 @@ renderers.push(function library_(){
   else if (s === 'paths') {
     const ps = [...C('paths').values()].sort((a,b) => String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
     const tr = [...C('tracks').values()];
-    const block = (kind, id, title, steps, extra='') => { const d = steps.filter(x => x.done).length; return `<details class="acc"><summary><span class="t">${esc(title)}</span><span class="mono faint" style="font-size:12px">${d}/${steps.length}</span><div class="bar"><i style="width:${steps.length ? Math.round(d/steps.length*100) : 0}%"></i></div></summary><div class="in">${extra}<div class="row" style="margin:8px 0;justify-content:flex-end"><button class="btn small ghost" data-padd="${kind}" data-id="${esc(id)}">＋ Add step</button><button class="btn small ghost" data-pname="${kind}" data-id="${esc(id)}">✎ Edit title / intro</button></div><ul class="items">${steps.map((st, i) => `<li class="${st.done ? 'done' : ''}"><input type="checkbox" class="check" data-k="${kind}" data-id="${esc(id)}" data-i="${i}" ${st.done ? 'checked' : ''} aria-label="Done"><div class="body">${resourceThumbnail(st.url,st.videoId,st.t,ytId(st.url,st.videoId)?'video':'resource')}<div class="t">${safeUrl(st.url) ? `<a href="${esc(safeUrl(st.url))}" target="_blank" rel="noopener">${esc(st.t)}</a>` : esc(st.t)}</div>${st.summary ? `<div class="faint" style="font-size:13px">${esc(st.summary)}</div>` : ''}${(st.links||[]).length ? `<div class="faint" style="font-size:12.5px">${st.links.slice(0,4).map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label||'link')}</a> ${saveResourceButton(l.label||l.url,l.url,'resource')}`).join(' · ')}</div>` : ''}${saveResourceButton(st.t,st.url,'resource',st.videoId)}</div><span class="m">${esc(st.dur||'')}</span><button class="btn small ghost" data-pstep="${kind}" data-id="${esc(id)}" data-i="${i}" title="Edit this step">✎</button></li>`).join('')}</ul><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn small ghost" data-pdel="${kind}" data-id="${esc(id)}">Delete</button></div></div></details>`; };
+    const block = (kind, id, title, steps, extra='') => { const d = steps.filter(x => x.done).length; return `<details class="acc"><summary><span class="t">${esc(title)}</span><span class="mono faint" style="font-size:12px">${d}/${steps.length}</span><div class="bar"><i style="width:${steps.length ? Math.round(d/steps.length*100) : 0}%"></i></div></summary><div class="in">${extra}<div class="row" style="margin:8px 0;justify-content:flex-end">${saveResourceButton(title,'','path')}<button class="btn small ghost" data-padd="${kind}" data-id="${esc(id)}">＋ Add step</button><button class="btn small ghost" data-pname="${kind}" data-id="${esc(id)}">✎ Edit title / intro</button></div><ul class="items">${steps.map((st, i) => `<li class="${st.done ? 'done' : ''}"><input type="checkbox" class="check" data-k="${kind}" data-id="${esc(id)}" data-i="${i}" ${st.done ? 'checked' : ''} aria-label="Done"><div class="body">${resourceThumbnail(st.url,st.videoId,st.t,ytId(st.url,st.videoId)?'video':'resource')}<div class="t">${safeUrl(st.url) ? `<a href="${esc(safeUrl(st.url))}" target="_blank" rel="noopener">${esc(st.t)}</a>` : esc(st.t)}</div>${st.summary ? `<div class="faint" style="font-size:13px">${esc(st.summary)}</div>` : ''}${(st.links||[]).length ? `<div class="faint" style="font-size:12.5px">${st.links.slice(0,4).map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label||'link')}</a> ${saveResourceButton(l.label||l.url,l.url,'resource')}`).join(' · ')}</div>` : ''}${saveResourceButton(st.t,st.url,'path-step',st.videoId,st.summary)}</div><span class="m">${esc(st.dur||'')}</span><button class="btn small ghost" data-pstep="${kind}" data-id="${esc(id)}" data-i="${i}" title="Edit this step">✎</button></li>`).join('')}</ul><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn small ghost" data-pdel="${kind}" data-id="${esc(id)}">Delete</button></div></div></details>`; };
     el.innerHTML = `<div class="sec-h"><h3>Paths and study kits</h3><span class="faint" style="font-size:13px">${ps.length}</span></div><p class="muted" style="font-size:14px;margin:-4px 0 14px">Follow a path in order. Check off steps as you finish; use ✎ to change a step or add your own. Progress is saved to your account.</p>`
       + (ps.length ? ps.map(p => block('path', p.id, p.title, p.steps||[], p.notes ? `<div class="md faint" style="font-size:13.5px;margin-bottom:8px">${md(String(p.notes).split('Key points:')[0].slice(0,600))}</div>` : '')).join('') : '<div class="empty">No paths.</div>')
       + (tr.length ? `<div class="sec-h" style="margin-top:22px"><h3>AI Academy tracks</h3></div>` + tr.map(t => block('track', t.id, t.title, t.steps||[], t.summary ? `<p class="faint" style="font-size:13.5px;margin-bottom:8px">${esc(t.summary)}</p>` : '')).join('') : '');
@@ -1450,7 +1456,7 @@ renderers.push(function library_(){
   }
   else if (s === 'news') {
     const ns = [...C('news').values()];
-    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => { const coursePlaces=resourceCourseLocations(x.url,x.videoId); const where=coursePlaces.length ? `<div class="faint" style="font-size:12px;margin-top:5px">Already in course: ${coursePlaces.slice(0,3).map(p=>`${esc(p.course)} → ${esc(p.module)}`).join(' · ')}${coursePlaces.length>3?' · +'+(coursePlaces.length-3)+' more':''}</div>` : ''; return `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a></div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div>${where}</div><span class="pill">${esc(x.kind||'')}</span>${saveResourceButton(x.title||x.url,x.url,x.kind==='video'?'video':'resource',x.videoId)}</li>`; }).join('')}</ul>` : '<div class="empty">No news yet.</div>';
+    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => { const coursePlaces=resourceCourseLocations(x.url,x.videoId); return `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a> ${newsCourseFlag(coursePlaces)}</div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div></div><span class="pill">${esc(x.kind||'')}</span>${saveResourceButton(x.title||x.url,x.url,x.kind==='video'?'video':'resource',x.videoId)}</li>`; }).join('')}</ul>` : '<div class="empty">No news yet.</div>';
   }
   else if (s === 'tasks') {
     const ts = [...C('tasks').values()].sort((a,b) => (a.done?1:0)-(b.done?1:0) || String(a.due||'9').localeCompare(String(b.due||'9')));

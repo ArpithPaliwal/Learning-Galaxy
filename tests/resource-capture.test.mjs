@@ -26,8 +26,26 @@ test('Library News cards can be saved and identify any existing course module lo
     'function resourceCourseLocations(',
     'saveResourceButton(x.title||x.url,x.url',
     'resourceCourseLocations(x.url,x.videoId',
-    'Already in course:'
+    'newsCourseFlag(coursePlaces)'
   ]) assert.ok(html.includes(marker), `missing Library News behavior: ${marker}`);
+});
+
+test('Library Paths can save whole paths and linkless steps to buckets or courses', () => {
+  for (const marker of [
+    "saveResourceButton(title,'','path'",
+    "saveResourceButton(st.t,st.url,'path-step'",
+    "data-save-summary",
+    'resource.summary||'
+  ]) assert.ok(html.includes(marker), `missing Library Paths save behavior: ${marker}`);
+});
+
+test('Library News uses a compact course-presence flag with a location when present', () => {
+  for (const marker of [
+    'function newsCourseFlag(',
+    'newsCourseFlag(coursePlaces)',
+    'Not in course',
+    'In: '
+  ]) assert.ok(html.includes(marker), `missing Library News presence flag: ${marker}`);
 });
 
 test('every curated playlist has a first-video ID to render a thumbnail', () => {
