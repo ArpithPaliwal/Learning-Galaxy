@@ -959,6 +959,16 @@ const safeUrl = u => /^https?:\/\//i.test(String(u||'').trim()) ? String(u).trim
 const ytSearch = q => 'https://www.youtube.com/results?search_query='+encodeURIComponent(q);
 const ytId = (u, explicit='') => { const x = String(explicit || u || ''); const m = x.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/) || ( /^[A-Za-z0-9_-]{11}$/.test(x) ? [x,x] : null ); return m ? m[1] : ''; };
 const ytThumb = (url, explicit, alt='') => { const id = ytId(url, explicit); return id ? `<a class="yt-thumb" href="${esc(safeUrl(url))}" target="_blank" rel="noopener" aria-label="Watch ${esc(alt)} on YouTube"><img loading="lazy" src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="YouTube thumbnail: ${esc(alt)}" onerror="this.closest('.yt-thumb').hidden=true"><span>▶</span></a>` : ''; };
+function resourceCourseLocations(url, videoId=''){
+  const raw=safeUrl(url); if(!raw)return [];
+  const targetId=ytId(raw)||ytId(videoId);
+  const normalize=u=>{const v=safeUrl(u);if(!v)return '';try{const x=new URL(v);x.hash='';for(const k of [...x.searchParams.keys()])if(/^utm_/i.test(k)||/^(fbclid|gclid)$/i.test(k))x.searchParams.delete(k);return x.href.replace(/\/$/,'');}catch(e){return v.replace(/\/$/,'');}};
+  const targetUrl=normalize(raw);
+  const matches=v=>{const vu=safeUrl(v.url||v.link||'');const vid=ytId(vu)||(/^[A-Za-z0-9_-]{11}$/.test(String(v.id||''))?String(v.id):'');if(targetId&&vid===targetId)return true;return !!targetUrl&&!!vu&&normalize(vu)===targetUrl;};
+  const found=[];
+  for(const c of C('courses').values())for(const [mi,m] of (c.modules||[]).entries())if((m.videos||[]).some(matches))found.push({course:c.title||c.ask||'Untitled course',module:m.t||'Module '+(mi+1)});
+  return found;
+}
 function saveResourceButton(title, url, kind='resource', videoId=''){
   const u=safeUrl(url); if(!u)return '';
   const kindName=(kind==='video'||kind==='playlist'||ytId(u)||/\.(?:mp4|webm|m3u8)(?:$|\?)/i.test(u))?'video':'resource';
@@ -1440,7 +1450,7 @@ renderers.push(function library_(){
   }
   else if (s === 'news') {
     const ns = [...C('news').values()];
-    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a></div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div></div><span class="pill">${esc(x.kind||'')}</span></li>`).join('')}</ul>` : '<div class="empty">No news yet.</div>';
+    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => { const coursePlaces=resourceCourseLocations(x.url,x.videoId); const where=coursePlaces.length ? `<div class="faint" style="font-size:12px;margin-top:5px">Already in course: ${coursePlaces.slice(0,3).map(p=>`${esc(p.course)} → ${esc(p.module)}`).join(' · ')}${coursePlaces.length>3?' · +'+(coursePlaces.length-3)+' more':''}</div>` : ''; return `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a></div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div>${where}</div><span class="pill">${esc(x.kind||'')}</span>${saveResourceButton(x.title||x.url,x.url,x.kind==='video'?'video':'resource',x.videoId)}</li>`; }).join('')}</ul>` : '<div class="empty">No news yet.</div>';
   }
   else if (s === 'tasks') {
     const ts = [...C('tasks').values()].sort((a,b) => (a.done?1:0)-(b.done?1:0) || String(a.due||'9').localeCompare(String(b.due||'9')));

@@ -21,6 +21,15 @@ test('course lesson, Library video, topic resource, path resource, and Radar car
   ]) assert.ok(html.includes(marker), `missing save action at ${marker}`);
 });
 
+test('Library News cards can be saved and identify any existing course module location', () => {
+  for (const marker of [
+    'function resourceCourseLocations(',
+    'saveResourceButton(x.title||x.url,x.url',
+    'resourceCourseLocations(x.url,x.videoId',
+    'Already in course:'
+  ]) assert.ok(html.includes(marker), `missing Library News behavior: ${marker}`);
+});
+
 test('every curated playlist has a first-video ID to render a thumbnail', () => {
   const picks = JSON.parse(readFileSync(new URL('../app/ai-video-picks.json', import.meta.url), 'utf8'));
   for (const playlist of picks.playlists) {
