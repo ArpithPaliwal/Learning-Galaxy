@@ -319,6 +319,10 @@
     drawDrawer();
   }
   B.open = id => open(id, true);
+  B.moveTo = (t, to) => moveTo(t, to);
+  B.lane = t => lane(t);
+  B.research = (title, id) => quickResearch(title, id);
+  B.plan = () => planMoves();
   function chipList(ids, kind) {
     return (ids || []).map(i => { const x = C('topics').get(i); return x ? `<span class="chip ${done(x) ? 'ok' : ''}"><a data-go="${esc(i)}">${esc(x.title)}</a>${kind ? `<button data-rm="${kind}" data-v="${esc(i)}" title="Remove">×</button>` : ''}</span>` : ''; }).join('');
   }

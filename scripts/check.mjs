@@ -57,6 +57,9 @@ if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < htm
 { const ok3 = html.includes('src="lg-brain.js"') && html.includes('window.LGCore = {') && html.includes('id="brainHost"') && html.includes('id="tHV"') && html.includes('window.LGBrain.open(id)');
   const seedOk = (() => { try { const d = JSON.parse(readFileSync('app/brain-seed.json', 'utf8')); const ids = new Set(Object.keys(d.topics)); const bad = Object.values(d.topics).flatMap(t => [...(t.prereqs||[]), ...(t.related||[])]).filter(x => !ids.has(x)); return Object.keys(d.categories).length > 5 && ids.size > 50 && !bad.length && [...ids].every(i => /^[A-Za-z0-9_.~:@+-]{1,200}$/.test(i)); } catch (e) { return false; } })();
   if (!ok3) fail('Brain: lg-brain.js, window.LGCore, #brainHost, #tHV and openTopic → LGBrain must be wired'); else if (!seedOk) fail('brain-seed.json invalid (ids, links or size)'); else ok('Brain is wired and the curriculum seed is valid'); }
+// Jarvis → Hermes bridge must stay wired
+{ const okH = html.includes("'hermes'];") && html.includes('id="jHermes"') && html.includes("case 'hermes':") && html.includes('function hermesQueue') && html.includes("case 'move_topic':");
+  if (!okH) fail('Hermes bridge: COLS hermes, #jHermes, hermesQueue and the hermes/move_topic actions must be wired'); else ok('Jarvis → Hermes bridge and Brain actions are wired'); }
 { const fe = validateFeed(JSON.parse(readFileSync('app/feed/latest.json', 'utf8'))); if (fe.length) fail('feed: ' + fe.join('; ')); else ok('daily feed is valid'); }
 
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }

@@ -100,3 +100,8 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - User chose: keep Supabase as the live DB (web + phone); **mirror to an Obsidian vault nightly** (scripts/mirror-obsidian.mjs, see docs/OBSIDIAN.md); start fresh with the AI Brain curriculum (106 topics, 11 tracks).
 - Deep research from the Brain queues `research` docs with a `topic` field; jobs/daily.md step 2 now also patches that topic.
 - Not done: Jarvis actions for H/V lanes; live test of arXiv relay on Netlify.
+
+## Jarvis → Hermes bridge (2026-11-28)
+- ☤ button in the Jarvis header = Hermes mode (all messages go to the Hermes agent on the PC). Jarvis can also delegate with the `hermes` action.
+- PC side: `scripts/hermes-bridge.mjs`, auto-started at logon by `Startup/Learning Galaxy Hermes bridge.vbs` → `%LOCALAPPDATA%/learning-galaxy/hermes-bridge.cmd`; log `hermes-bridge.log`.
+- Hermes side: API server enabled in `%LOCALAPPDATA%/hermes/.env` (API_SERVER_ENABLED/KEY, 127.0.0.1 only). Needs (1) a Hermes restart to load it and (2) a provider the headless gateway can use (`hermes model`): as of 2026-11-28 only the desktop app had model access, so cron + API server runs fail with blocked_config.

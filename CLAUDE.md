@@ -43,6 +43,11 @@ No dependencies, no bundler. Don't add any without a strong reason.
   AI curriculum seed `app/brain-seed.json` (written once per account, `meta/brainSeed`). It reaches the app only via
   `window.LGCore` (set at the end of index.html's inline script). Topic fields it adds: `level`, `prereqs[]`, `mode`,
   `kind`, `confidence`, `researched`. The seed is generated from `~/ai-brain` with `py brain.py export-lg`.
+- **Jarvis → Hermes bridge**: collection `hermes` (`hermes/<id>` {prompt, context, status pending→running→done|error, reply,
+  error}) + heartbeat `meta/hermes` {online, bridge, seen}. The app writes requests (☤ Hermes mode in the Jarvis header, or
+  the `hermes` action Jarvis can emit); `scripts/hermes-bridge.mjs` on the learner's PC polls Supabase, runs them on the
+  local Hermes API server (127.0.0.1:8642, key in `%LOCALAPPDATA%/learning-galaxy/mirror.env`) and streams replies back.
+  Jarvis also has Brain actions: move_topic, research_topic, open_topic, plan_moves (via `window.LGBrain`).
 - `app/theme-glass.css` — glass layer (loaded last): frosted panels, nebula backdrop, Brain/Kanban/drawer styles.
 - `app/lg-app.js` — the ⚡ App panel (AI key, sync sign-in, Builder, backup import/export), service-worker registration, update banner.
 - `app/sw.js` — stale-while-revalidate app shell; the build stamps `CACHE` so each deploy purges the old cache.

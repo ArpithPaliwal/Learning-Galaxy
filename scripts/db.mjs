@@ -29,7 +29,7 @@ const ID = /^[A-Za-z0-9_\-.~:@+]{1,200}$/;
 async function req(url, opts = {}) {
   const res = await fetch(url, { ...opts, headers: { ...H, ...(opts.headers || {}) } });
   if (!res.ok) { console.error('HTTP ' + res.status + ': ' + (await res.text()).slice(0, 400)); process.exit(1); }
-  return res.status === 204 || res.status === 201 ? null : res.json();
+  const t = await res.text(); return t ? JSON.parse(t) : null;
 }
 const readJson = (f) => JSON.parse(f === '-' ? readFileSync(0, 'utf8') : readFileSync(f, 'utf8'));
 async function getDoc(col, id) { const rows = await req(`${base}?${uid}&path=eq.${encodeURIComponent(col + '/' + id)}&deleted=is.false&select=data`); return rows[0] ? rows[0].data : undefined; }
