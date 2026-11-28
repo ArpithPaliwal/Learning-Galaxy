@@ -959,6 +959,51 @@ const safeUrl = u => /^https?:\/\//i.test(String(u||'').trim()) ? String(u).trim
 const ytSearch = q => 'https://www.youtube.com/results?search_query='+encodeURIComponent(q);
 const ytId = (u, explicit='') => { const x = String(explicit || u || ''); const m = x.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/) || ( /^[A-Za-z0-9_-]{11}$/.test(x) ? [x,x] : null ); return m ? m[1] : ''; };
 const ytThumb = (url, explicit, alt='') => { const id = ytId(url, explicit); return id ? `<a class="yt-thumb" href="${esc(safeUrl(url))}" target="_blank" rel="noopener" aria-label="Watch ${esc(alt)} on YouTube"><img loading="lazy" src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="YouTube thumbnail: ${esc(alt)}" onerror="this.closest('.yt-thumb').hidden=true"><span>▶</span></a>` : ''; };
+function saveResourceButton(title, url, kind='resource', videoId=''){
+  const u=safeUrl(url); if(!u)return '';
+  const kindName=(kind==='video'||kind==='playlist'||ytId(u)||/\.(?:mp4|webm|m3u8)(?:$|\?)/i.test(u))?'video':'resource';
+  return `<button class="btn small ghost" data-save-resource data-save-title="${esc(title||u)}" data-save-url="${esc(u)}" data-save-kind="${kindName}" data-save-video-id="${esc(videoId||ytId(u))}">＋ Save to…</button>`;
+}
+function resourceThumbnail(url, videoId, title, kind='resource'){
+  const u=safeUrl(url); if(!u)return '';
+  const yt=ytThumb(u,videoId,title); if(yt)return yt;
+  if(kind!=='video'&&kind!=='playlist'&&!/\.(?:mp4|webm|m3u8)(?:$|\?)/i.test(u))return '';
+  return `<div class="yt-thumb resource-thumb" aria-label="Video preview: ${esc(title||'video')}"><span>▶</span></div>`;
+}
+function openResourceSave(resource){
+  const courses=activeCourses(), initialCourse=courses[0]?.id||'';
+  const moduleOptions=c=>{const ms=c?.modules||[];return ms.map((m,i)=>`<option value="${esc(m.id||String(i))}">${esc(m.t||'Module '+(i+1))}</option>`).join('')+'<option value="__new">＋ New module</option>';};
+  openModal(`<h3>Save resource</h3><p class="muted" style="margin:6px 0 14px">${esc(resource.title)}</p>
+    <div class="field"><span class="label">Save to</span><select class="inp" data-save-destination><option value="bucket">My Buckets</option><option value="course">A course</option></select></div>
+    <div data-save-course-fields hidden><div class="field"><span class="label">Course</span><select class="inp" data-save-course>${courses.map(c=>`<option value="${esc(c.id)}" ${c.id===initialCourse?'selected':''}>${esc(c.title||c.ask||'Untitled course')}</option>`).join('')}</select></div>
+      <div class="field"><span class="label">Place it in</span><select class="inp" data-save-module>${moduleOptions(courses[0])}</select></div>
+      <div class="field" data-save-new-wrap hidden><span class="label">New module name</span><input class="inp" data-save-new-module maxlength="120" placeholder="e.g. Extra videos and resources"></div></div>
+    <div class="field" data-save-bucket-fields><span class="label">Classify this resource</span>${curationSelect(resource.kind==='video'?'Video':'Other','data-save-bucket-kind')}</div>
+    <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" data-save-confirm>Save</button></div>`,()=>{
+      const dest=$('[data-save-destination]'), cf=$('[data-save-course-fields]'), bf=$('[data-save-bucket-fields]'), courseSel=$('[data-save-course]'), moduleSel=$('[data-save-module]'), newWrap=$('[data-save-new-wrap]');
+      const drawModules=()=>{const c=C('courses').get(courseSel.value);moduleSel.innerHTML=moduleOptions(c);newWrap.hidden=moduleSel.value!=='__new';};
+      const drawDest=()=>{const course=dest.value==='course';cf.hidden=!course;bf.hidden=course;};
+      dest.onchange=drawDest; courseSel.onchange=drawModules; moduleSel.onchange=()=>{newWrap.hidden=moduleSel.value!=='__new';}; drawModules();drawDest();
+      $('[data-save-confirm]').onclick=async()=>{
+        if(dest.value==='bucket'){
+          const kind=$('[data-save-bucket-kind]').value;
+          await put('buckets',`saved-${slug(resource.title)}-${rid()}`,{title:resource.title,url:resource.url,videoId:resource.videoId||'',kind,notes:'',resources:[],source:'manual',created:nowIso(),updated:nowIso()});
+          closeModal();toast('Saved to My Buckets.');return;
+        }
+        const c=C('courses').get(courseSel.value); if(!c){toast('Choose a course first.');return;}
+        const modules=[...(c.modules||[])];let mi=modules.findIndex((m,i)=>String(m.id||i)===moduleSel.value);
+        if(moduleSel.value==='__new'){
+          const t=$('[data-save-new-module]').value.trim();if(!t){toast('Name the new module.');return;}
+          modules.push({id:'m'+rid(),t,goal:'',videos:[]});mi=modules.length-1;
+        }
+        if(mi<0){toast('Choose where in the course to place it.');return;}
+        const lesson={key:'v'+rid(),q:'',title:resource.title,id:resource.videoId||ytId(resource.url)||undefined,url:resource.url,min:15,done:false,kind:resource.kind||'resource'};
+        modules[mi]=Object.assign({},modules[mi],{videos:[...(modules[mi].videos||[]),lesson]});
+        await patch('courses',c.id,{modules,status:'ready',touched:nowIso()});closeModal();toast('Added to '+(c.title||'course')+'.');
+      };
+    });
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-save-resource]');if(b)openResourceSave({title:b.dataset.saveTitle,url:b.dataset.saveUrl,kind:b.dataset.saveKind,videoId:b.dataset.saveVideoId});});
 const fmtMin = m => { m = Math.round(m||0); return m < 60 ? m+' min' : Math.floor(m/60)+' h'+(m%60 ? ' '+(m%60)+' min' : ''); };
 const LS = { get(k,d){ try{ const v = localStorage.getItem('lg3.'+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem('lg3.'+k, JSON.stringify(v)); }catch(e){} } };
 let toastT; function toast(m, ms=3200){ const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
@@ -1230,11 +1275,11 @@ renderers.push(function courses_(){
     ${c.status === 'failed' && c.error ? `<div class="status" style="border-color:var(--crit)">${esc(c.error)}</div>` : ''}
     ${(c.outcomes||[]).length ? `<div class="card" style="margin-top:14px"><div class="label">After this course you can</div><ul style="margin:8px 0 0;padding-left:20px">${c.outcomes.map(o => `<li>${esc(o)}</li>`).join('')}</ul></div>` : ''}
     ${(c.modules||[]).map((mo, mi) => `<div class="mod"><h4><span class="n">${pad(mi+1)}</span>${esc(mo.t)}</h4>${mo.goal ? `<p>${esc(mo.goal)}</p>` : ''}
-      ${(mo.videos||[]).map(v => { const url = safeUrl(v.url) || ytSearch(v.q); const real = !!v.id; return `<div class="vid ${v.done ? 'done' : ''}">
+      ${(mo.videos||[]).map(v => { const url = safeUrl(v.url) || ytSearch(v.q); const videoId=v.id||ytId(url); const real=!!videoId; return `<div class="vid ${v.done ? 'done' : ''}">
         <a class="play" href="${esc(url)}" target="_blank" rel="noopener" aria-label="Open on YouTube">▶</a>
-        <div style="min-width:0">${ytThumb(url, v.id, real ? v.title : v.q)}<div class="vt"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(real ? v.title : v.q)}</a></div>
+        <div style="min-width:0">${resourceThumbnail(url, videoId, real ? (v.title||v.q) : v.q, 'video')}<div class="vt"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(real ? (v.title||v.q) : v.q)}</a></div>
           <div class="vm">${real ? esc([v.channel, v.dur].filter(Boolean).join(' · ')) : 'YouTube search · ~'+fmtMin(v.min)}</div>
-          ${v.why ? `<div class="vw">${esc(v.why)}</div>` : ''}${(v.points||[]).length ? `<ul>${v.points.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div>
+          ${v.why ? `<div class="vw">${esc(v.why)}</div>` : ''}${(v.points||[]).length ? `<ul>${v.points.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}${saveResourceButton(real ? (v.title||v.q) : v.q,url,'video',videoId)}</div>
         <div class="side"><input type="checkbox" class="check" data-v="${esc(v.key)}" ${v.done ? 'checked' : ''} aria-label="Watched">${v.done ? `<button class="btn small ghost" data-tbv="${esc(v.key)}">Teach back</button>` : `<span class="mono faint" style="font-size:11.5px">${real ? '' : 'search'}</span>`}</div></div>`; }).join('')}</div>`).join('')}
     ${c.project ? `<div class="card" style="margin-top:18px"><div class="label">Final project</div><p style="margin-top:6px">${esc(c.project)}</p></div>` : ''}
     ${c.guide ? `<details class="acc" style="margin-top:14px" open><summary><span class="t">Compiled study notes</span><span class="faint mono" style="font-size:12px">from the videos</span></summary><div class="in md">${md(c.guide)}</div></details>` : ''}`;
@@ -1259,7 +1304,7 @@ const STATUS = {suggested:['Suggested','var(--st-sugg)'], todo:['To learn','var(
 let libFilter = LS.get('libFilter', 'active');
 let aiVideoPicks = null, aiVideoPicksLoading = false;
 function loadAiVideoPicks(){ if (aiVideoPicks || aiVideoPicksLoading) return; aiVideoPicksLoading = true; fetch('ai-video-picks.json').then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(d => { aiVideoPicks = d; }).catch(() => { aiVideoPicks = {videos:[],playlists:[]}; }).finally(() => { aiVideoPicksLoading = false; if (S.tab === 'library' && S.sub === 'videos') render(); }); }
-const CURATION_TYPES = ['Tool','Tutorial','Workflow','Project','Paper / article','Course','Dataset','Prompt','Product','Inspiration','News','Idea','Other'];
+const CURATION_TYPES = ['Video','Tool','Tutorial','Workflow','Project','Paper / article','Course','Dataset','Prompt','Product','Inspiration','News','Idea','Other'];
 function readLinkLines(text){
   const rows = String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean), links=[], invalid=[];
   for (const row of rows) { const i=row.indexOf('|'), label=i>=0?row.slice(0,i).trim():''; const raw=(i>=0?row.slice(i+1):row).trim(), url=safeUrl(raw); if(!url) invalid.push(row); else links.push({label:label||url,url}); }
@@ -1292,13 +1337,13 @@ function openCurationEditor(area, item){
       };
     });
 }
-function curationResources(items){ return (items||[]).map(r=>{const u=safeUrl(r.url);return u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(r.label||u)}</a>`:''}).filter(Boolean).join(' · '); }
+function curationResources(items){ return (items||[]).map(r=>{const u=safeUrl(r.url);return u?`<span class="curation-resource"><a href="${esc(u)}" target="_blank" rel="noopener">${esc(r.label||u)}</a>${saveResourceButton(r.label||u,u,ytId(u)?'video':'resource')}</span>`:''}).filter(Boolean).join(' · '); }
 function curationCard(item, ig){
-  const u=safeUrl(item.url), sources=curationResources(item.resources);
-  return `<article class="card" style="margin-bottom:10px"><div class="sec-h"><h3>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(item.title)}</a>`:esc(item.title)}</h3><div class="row" style="gap:5px"><span class="pill">${esc(item.kind||'Other')}</span>${ig&&item.aiKind?`<span class="pill">AI: ${esc(item.aiKind)}</span>`:''}</div></div>
+  const u=safeUrl(item.url), sources=curationResources(item.resources), kind=(ig||item.kind==='Video'||item.videoId||ytId(u))?'video':'resource';
+  return `<article class="card" style="margin-bottom:10px">${u?resourceThumbnail(u,item.videoId,item.title,kind):''}<div class="sec-h"><h3>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(item.title)}</a>`:esc(item.title)}</h3><div class="row" style="gap:5px"><span class="pill">${esc(item.kind||'Other')}</span>${ig&&item.aiKind?`<span class="pill">AI: ${esc(item.aiKind)}</span>`:''}</div></div>
     ${ig&&item.aiKindReason?`<p class="faint" style="font-size:12.5px;margin:4px 0">AI classification: ${esc(item.aiKindReason)}</p>`:''}${item.notes?`<p class="muted" style="font-size:13.5px;margin:4px 0">${esc(item.notes)}</p>`:''}${ig&&item.caption?`<details style="margin:7px 0"><summary class="faint">Caption / transcript</summary><p class="muted" style="font-size:13px;white-space:pre-wrap;margin-top:6px">${esc(item.caption)}</p></details>`:''}
     ${sources?`<div class="faint" style="font-size:12.5px;margin-top:8px"><b>Resources:</b> ${sources}</div>`:''}
-    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn small ghost" ${ig?'data-ig-research':'data-bucket-edit'}="${esc(item.id)}">${ig?'Research this Reel':'Edit'}</button>${ig?`<button class="btn small ghost" data-ig-edit="${esc(item.id)}">Edit</button>`:''}<button class="btn small ghost" ${ig?'data-ig-delete':'data-bucket-delete'}="${esc(item.id)}">Delete</button></div></article>`;
+    <div class="row" style="justify-content:flex-end;margin-top:10px">${u?saveResourceButton(item.title,u,kind,item.videoId):''}<button class="btn small ghost" ${ig?'data-ig-research':'data-bucket-edit'}="${esc(item.id)}">${ig?'Research this Reel':'Edit'}</button>${ig?`<button class="btn small ghost" data-ig-edit="${esc(item.id)}">Edit</button>`:''}<button class="btn small ghost" ${ig?'data-ig-delete':'data-bucket-delete'}="${esc(item.id)}">Delete</button></div></article>`;
 }
 function renderManualBuckets(el){
   const items=[...C('buckets').values()].sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
@@ -1352,7 +1397,7 @@ renderers.push(function library_(){
   else if (s === 'paths') {
     const ps = [...C('paths').values()].sort((a,b) => String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
     const tr = [...C('tracks').values()];
-    const block = (kind, id, title, steps, extra='') => { const d = steps.filter(x => x.done).length; return `<details class="acc"><summary><span class="t">${esc(title)}</span><span class="mono faint" style="font-size:12px">${d}/${steps.length}</span><div class="bar"><i style="width:${steps.length ? Math.round(d/steps.length*100) : 0}%"></i></div></summary><div class="in">${extra}<div class="row" style="margin:8px 0;justify-content:flex-end"><button class="btn small ghost" data-padd="${kind}" data-id="${esc(id)}">＋ Add step</button><button class="btn small ghost" data-pname="${kind}" data-id="${esc(id)}">✎ Edit title / intro</button></div><ul class="items">${steps.map((st, i) => `<li class="${st.done ? 'done' : ''}"><input type="checkbox" class="check" data-k="${kind}" data-id="${esc(id)}" data-i="${i}" ${st.done ? 'checked' : ''} aria-label="Done"><div class="body">${ytThumb(st.url, st.videoId, st.t)}<div class="t">${safeUrl(st.url) ? `<a href="${esc(safeUrl(st.url))}" target="_blank" rel="noopener">${esc(st.t)}</a>` : esc(st.t)}</div>${st.summary ? `<div class="faint" style="font-size:13px">${esc(st.summary)}</div>` : ''}${(st.links||[]).length ? `<div class="faint" style="font-size:12.5px">${st.links.slice(0,4).map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label||'link')}</a>`).join(' · ')}</div>` : ''}</div><span class="m">${esc(st.dur||'')}</span><button class="btn small ghost" data-pstep="${kind}" data-id="${esc(id)}" data-i="${i}" title="Edit this step">✎</button></li>`).join('')}</ul><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn small ghost" data-pdel="${kind}" data-id="${esc(id)}">Delete</button></div></div></details>`; };
+    const block = (kind, id, title, steps, extra='') => { const d = steps.filter(x => x.done).length; return `<details class="acc"><summary><span class="t">${esc(title)}</span><span class="mono faint" style="font-size:12px">${d}/${steps.length}</span><div class="bar"><i style="width:${steps.length ? Math.round(d/steps.length*100) : 0}%"></i></div></summary><div class="in">${extra}<div class="row" style="margin:8px 0;justify-content:flex-end"><button class="btn small ghost" data-padd="${kind}" data-id="${esc(id)}">＋ Add step</button><button class="btn small ghost" data-pname="${kind}" data-id="${esc(id)}">✎ Edit title / intro</button></div><ul class="items">${steps.map((st, i) => `<li class="${st.done ? 'done' : ''}"><input type="checkbox" class="check" data-k="${kind}" data-id="${esc(id)}" data-i="${i}" ${st.done ? 'checked' : ''} aria-label="Done"><div class="body">${resourceThumbnail(st.url,st.videoId,st.t,ytId(st.url,st.videoId)?'video':'resource')}<div class="t">${safeUrl(st.url) ? `<a href="${esc(safeUrl(st.url))}" target="_blank" rel="noopener">${esc(st.t)}</a>` : esc(st.t)}</div>${st.summary ? `<div class="faint" style="font-size:13px">${esc(st.summary)}</div>` : ''}${(st.links||[]).length ? `<div class="faint" style="font-size:12.5px">${st.links.slice(0,4).map(l => `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label||'link')}</a> ${saveResourceButton(l.label||l.url,l.url,'resource')}`).join(' · ')}</div>` : ''}${saveResourceButton(st.t,st.url,'resource',st.videoId)}</div><span class="m">${esc(st.dur||'')}</span><button class="btn small ghost" data-pstep="${kind}" data-id="${esc(id)}" data-i="${i}" title="Edit this step">✎</button></li>`).join('')}</ul><div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn small ghost" data-pdel="${kind}" data-id="${esc(id)}">Delete</button></div></div></details>`; };
     el.innerHTML = `<div class="sec-h"><h3>Paths and study kits</h3><span class="faint" style="font-size:13px">${ps.length}</span></div><p class="muted" style="font-size:14px;margin:-4px 0 14px">Follow a path in order. Check off steps as you finish; use ✎ to change a step or add your own. Progress is saved to your account.</p>`
       + (ps.length ? ps.map(p => block('path', p.id, p.title, p.steps||[], p.notes ? `<div class="md faint" style="font-size:13.5px;margin-bottom:8px">${md(String(p.notes).split('Key points:')[0].slice(0,600))}</div>` : '')).join('') : '<div class="empty">No paths.</div>')
       + (tr.length ? `<div class="sec-h" style="margin-top:22px"><h3>AI Academy tracks</h3></div>` + tr.map(t => block('track', t.id, t.title, t.steps||[], t.summary ? `<p class="faint" style="font-size:13.5px;margin-bottom:8px">${esc(t.summary)}</p>` : '')).join('') : '');
@@ -1382,8 +1427,8 @@ renderers.push(function library_(){
     if (!aiVideoPicks) { el.innerHTML = '<div class="status"><span class="spin"></span> Loading curated AI videos and playlists…</div>'; loadAiVideoPicks(); return; }
     const videos = aiVideoPicks.videos || [], playlists = aiVideoPicks.playlists || [];
     const thumb = id => /^[A-Za-z0-9_-]{11}$/.test(id||'') ? `<img loading="lazy" src="https://img.youtube.com/vi/${esc(id)}/hqdefault.jpg" alt="YouTube thumbnail" onerror="this.hidden=true">` : '<div style="aspect-ratio:16/9;background:linear-gradient(135deg,var(--panel-2),var(--bg-2));display:grid;place-items:center;color:var(--accent);font-size:30px" aria-hidden="true">▶</div>';
-    const videoCard = v => `<article class="yt-rec">${thumb(v.id)}<div class="yt-copy"><span class="pill yt-phase">${esc(v.phase||'AI learning')}</span><div class="yt-title"><a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">${esc(v.title)}</a></div><div class="yt-meta">${esc(v.channel||'YouTube')} · ${esc(v.level||'')} · ${fmtMin(v.minutes||0)}</div><p class="yt-why">${esc(v.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">▶ Watch video</a></div></article>`;
-    const playlistCard = p => `<article class="yt-rec">${thumb(p.firstVideoId)}<div class="yt-copy"><span class="pill yt-phase">${esc(p.phase||'Playlist')}</span><div class="yt-title"><a href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">${esc(p.title)}</a></div><div class="yt-meta">${esc(p.channel||'YouTube')} · Playlist</div><p class="yt-why">${esc(p.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">▶ Open playlist</a></div></article>`;
+    const videoCard = v => `<article class="yt-rec">${resourceThumbnail(v.url,v.id,v.title,'video')}<div class="yt-copy"><span class="pill yt-phase">${esc(v.phase||'AI learning')}</span><div class="yt-title"><a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">${esc(v.title)}</a></div><div class="yt-meta">${esc(v.channel||'YouTube')} · ${esc(v.level||'')} · ${fmtMin(v.minutes||0)}</div><p class="yt-why">${esc(v.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">▶ Watch video</a>${saveResourceButton(v.title,v.url,'video',v.id)}</div></article>`;
+    const playlistCard = p => `<article class="yt-rec">${resourceThumbnail(p.url,p.firstVideoId,p.title,'playlist')}<div class="yt-copy"><span class="pill yt-phase">${esc(p.phase||'Playlist')}</span><div class="yt-title"><a href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">${esc(p.title)}</a></div><div class="yt-meta">${esc(p.channel||'YouTube')} · Playlist</div><p class="yt-why">${esc(p.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">▶ Open playlist</a>${saveResourceButton(p.title,p.url,'playlist',p.firstVideoId)}</div></article>`;
     el.innerHTML = `<div class="card yt-guide"><b>Your watch order:</b> start with a visual explanation, then build along with the code-first courses. Treat videos as companions to the AI Builder Path—not a replacement for running the projects. No maths drills required.</div><section class="yt-section"><div class="sec-h"><h3>Recommended playlists</h3><span class="faint">${playlists.length} curated</span></div><div class="yt-grid">${playlists.map(playlistCard).join('')}</div></section><section class="yt-section"><div class="sec-h"><h3>Recommended individual videos</h3><span class="faint">${videos.length} curated</span></div><div class="yt-grid">${videos.map(videoCard).join('')}</div></section><p class="faint" style="font-size:12px;margin-top:12px">Recommendations are selected for your practical, no-maths learning path. YouTube links may change; if a link stops working, use the edit controls in Paths to replace it.</p>`;
   }
   else if (s === 'dsa') {
@@ -1409,7 +1454,7 @@ function openTopic(id){ if (window.LGBrain && window.LGBrain.open) return window
   openModal(`<div class="row" style="justify-content:space-between"><span class="pill" style="--c:${STATUS[t.status]?.[1]}">${esc(STATUS[t.status]?.[0] || t.status)}</span><span class="label">${esc(catOf(t.cat).name)}</span></div>
     <h3>${esc(t.title)}</h3>${t.why ? `<p class="faint" style="font-size:13.5px">${esc(t.why)}</p>` : ''}
     ${t.explain ? `<div class="md">${md(t.explain)}</div>` : `<p class="muted" style="font-size:14px">No explanation saved yet.</p>`}
-    ${(t.resources||[]).length ? `<div><div class="label" style="margin-bottom:6px">Resources</div>${t.resources.slice(0,8).map(r => `<div><a href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener">${esc(r.label||r.url)}</a></div>`).join('')}</div>` : ''}
+    ${(t.resources||[]).length ? `<div><div class="label" style="margin-bottom:6px">Resources</div>${t.resources.slice(0,8).map(r => {const u=safeUrl(r.url);return `<div class="row" style="margin:6px 0">${u?resourceThumbnail(u,r.videoId,r.label||u,ytId(u)?'video':'resource'):''}<a href="${esc(u)}" target="_blank" rel="noopener">${esc(r.label||r.url)}</a>${saveResourceButton(r.label||u,u,'resource',r.videoId)}</div>`;}).join('')}</div>` : ''}
     ${t.notes ? `<div><div class="label" style="margin-bottom:6px">My notes</div><p style="font-size:14px">${esc(t.notes)}</p></div>` : ''}
     <div class="row" style="justify-content:flex-end"><button class="btn" id="tpTb">Teach it back</button><button class="btn" id="tpCourse">Make a course</button><button class="btn" id="tpAsk">Explain with Jarvis</button><button class="btn primary" data-close>Close</button></div>`, () => {
     $('#tpAsk').onclick = () => { closeModal(); openJarvis(); jarvisAsk(`Explain "${t.title}" to me simply, with one example, then give me 2 quick questions to check myself.`); };
@@ -2178,8 +2223,8 @@ renderers.push(function radar_(){
   const list = feed.filter(x => rdTag === 'all' || (rdTag === 'watch' ? x.hit : x.tg === rdTag)).slice(0, 40);
   const tagName = Object.fromEntries(RD_TAGS);
   $('#rdFeed').innerHTML = list.length ? list.map(n => `<article class="rd-card t-${n.tg}"><div class="rd-meta"><span class="pill">${esc(tagName[n.tg] || n.tg)}</span>${n.hit ? '<span class="pill" style="--c:#ffd36e">★ watch</span>' : ''}<span>${esc(n.source||'')}</span><span>${esc(relDate(n.date))}</span></div>
-      ${n.kind === 'video' ? ytThumb(n.url, n.videoId, n.title) : ''}<h4><a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">${esc(n.title)}</a></h4>${n.summary ? `<p>${esc(n.summary)}</p>` : ''}
-      <div class="row"><button class="btn small" data-rsave="${esc(n.title)}">+ Bucket</button><button class="btn small ghost" data-rask="${esc(n.title)}">Why it matters to me</button>${n.savedTopic ? '<span class="faint" style="font-size:12px">saved</span>' : ''}</div></article>`).join('')
+      ${n.kind === 'video' ? resourceThumbnail(n.url,n.videoId,n.title,'video') : ''}<h4><a href="${esc(safeUrl(n.url))}" target="_blank" rel="noopener">${esc(n.title)}</a></h4>${n.summary ? `<p>${esc(n.summary)}</p>` : ''}
+      <div class="row">${saveResourceButton(n.title,n.url,n.kind==='video'?'video':'resource',n.videoId)}<button class="btn small" data-rsave="${esc(n.title)}">+ Brain bucket</button><button class="btn small ghost" data-rask="${esc(n.title)}">Why it matters to me</button>${n.savedTopic ? '<span class="faint" style="font-size:12px">saved</span>' : ''}</div></article>`).join('')
     : '<div class="ov-empty">Nothing here yet. The morning job adds news every day.</div>';
   $$('#rdFeed [data-rsave]').forEach(b => b.onclick = async () => { const t = b.dataset.rsave; if (findBy('topics', t)) { toast('Already in your bucket.'); return; } await put('topics', slug(t)+'-'+rid(), {title: t.slice(0,120), cat: [...C('categories').keys()].includes('ai') ? 'ai' : [...C('categories').keys()][0], status:'todo', source:'me', priority:2, parent:null, related:[], notes:'', explain:'', why:'Saved from the Radar', cards:[], resources:[], srs:null, log:[{d: today(), a:'added'}], created: nowIso()}); toast('Saved to your bucket.'); });
   $$('#rdFeed [data-rask]').forEach(b => b.onclick = () => { openJarvis(); jarvisAsk(`In 4-5 lines: what is "${b.dataset.rask}", why does it matter for me specifically (my goals and what I'm learning), and is it worth my time this week? If yes, offer to add it to my bucket or plan.`); });
