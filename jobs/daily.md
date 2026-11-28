@@ -36,6 +36,14 @@ Do these in order, starting at step 0 (skip a step if there is nothing to do):
    older than 7 days), research the `query` per its `mode` (learn | compare | reverse) and write the `dossier`
    in the same structure as the newest existing dossier, set `status: "ready"`, `researched` = now,
    `researchedBy: "claude"`, and push `{at, note}` onto `history`.
+   For `source: "instagram"`, use the saved `note` as user-supplied Reel context: it may contain a caption/transcript,
+   the user's question, and resource URLs. Research those claims and links, prioritize accessible primary sources,
+   cite the URLs you actually checked, and distinguish Reel claims from independently verified facts. Instagram may
+   block access; never imply you watched a private or inaccessible Reel. Preserve its `source` and `igId` fields.
+   When `igId` is present, also patch `instagram/<igId>` with `aiKind` (one best-fit label from Tool, Tutorial,
+   Workflow, Project, Paper / article, Course, Dataset, Prompt, Product, Inspiration, News, Idea, Other) and
+   `aiKindReason` (one sentence tied to the supplied content or verified resources). Leave the user's `kind` untouched;
+   if the content is inaccessible or too vague, use `Other` and state that in the reason.
    If the research item has a `topic` (a `topics` id, sent from the Brain), ALSO `get topics <topic>` and `patch` it:
    `explain` = markdown with `## Explanation` (300-600 words, intuition first, inline links only to sources you read),
    `## Learning steps` (ordered, ending with a small hands-on Python exercise) and `## What's new` (dated);

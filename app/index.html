@@ -237,6 +237,7 @@ textarea.inp{resize:vertical;min-height:44px;line-height:1.5}
 .subtabs button{border:1px solid var(--line);background:none;border-radius:2px;padding:5px 12px;color:var(--fg-3);font:700 12.5px var(--f-label);letter-spacing:.14em;text-transform:uppercase}
 .subtabs button:hover{color:var(--fg-2)}
 .subtabs button.on{color:var(--accent-2);border-color:var(--accent);background:rgb(var(--c-acc) / .08);box-shadow:0 0 12px var(--glow-soft)}
+.yt-section{margin:18px 0}.yt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:10px}.yt-rec{overflow:hidden;border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;min-width:0}.yt-rec:hover{border-color:var(--line-2)}.yt-rec img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--bg-2)}.yt-rec .yt-copy{padding:11px 13px;display:flex;flex-direction:column;gap:5px;flex:1}.yt-rec .yt-title{font-weight:700;line-height:1.35}.yt-rec .yt-title a{color:var(--fg);text-decoration:none}.yt-rec .yt-title a:hover{color:var(--accent-2)}.yt-rec .yt-why{font-size:13px;color:var(--fg-2);line-height:1.5}.yt-rec .yt-meta{font:11px var(--f-mono);color:var(--fg-3)}.yt-rec .yt-phase{align-self:flex-start}.yt-guide{margin-bottom:12px;padding:13px 15px}.yt-guide b{color:var(--accent-2)}
 details.acc{background:var(--panel);border:1px solid var(--line)}
 details.acc + details.acc{margin-top:8px}
 details.acc > summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}
@@ -817,6 +818,10 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
         <div class="subtabs" id="subtabs">
           <button data-sub="topics" class="on">Topics</button>
           <button data-sub="paths">Paths &amp; kits</button>
+          <button data-sub="videos">Videos</button>
+          <button data-sub="buckets">My Buckets</button>
+          <button data-sub="instagram">Instagram Links</button>
+          <button data-sub="ig-research">Instagram Research</button>
           <button data-sub="research">Research</button>
           <button data-sub="dsa">DSA</button>
           <button data-sub="news">News</button>
@@ -957,6 +962,24 @@ const ytThumb = (url, explicit, alt='') => { const id = ytId(url, explicit); ret
 const fmtMin = m => { m = Math.round(m||0); return m < 60 ? m+' min' : Math.floor(m/60)+' h'+(m%60 ? ' '+(m%60)+' min' : ''); };
 const LS = { get(k,d){ try{ const v = localStorage.getItem('lg3.'+k); return v==null ? d : JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem('lg3.'+k, JSON.stringify(v)); }catch(e){} } };
 let toastT; function toast(m, ms=3200){ const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+const DEFAULT_DAILY_REMINDERS = [
+  {id:'naam-jaap', title:'Naam Jaap', time:'07:00', enabled:true},
+  {id:'water-stretch', title:'Water + stretch break', time:'13:00', enabled:true},
+  {id:'ai-learning', title:'AI learning — one small lesson', time:'20:00', enabled:true}
+];
+function getDailyReminders(){ const r = LS.get('dailyReminders', null); return Array.isArray(r) ? r : DEFAULT_DAILY_REMINDERS.map(x => ({...x})); }
+function checkDailyReminders(now = new Date()){
+  const day = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const sent = LS.get('dailyReminderLast', {});
+  for (const r of getDailyReminders()) if (r.enabled && r.time === time && sent[r.id] !== day) {
+    sent[r.id] = day; LS.set('dailyReminderLast', sent);
+    const message = `${r.title} · ${r.id === 'naam-jaap' ? 'Take a quiet moment for Naam Jaap.' : r.id === 'ai-learning' ? 'A short, steady practice session is enough.' : 'Pause, hydrate and reset.'}`;
+    toast('🪷 '+message, 12000);
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('Learning Galaxy', {body:message}); } catch(e){}
+  }
+}
+setInterval(() => checkDailyReminders(), 30000); setTimeout(() => checkDailyReminders(), 1500);
 function md(src){
   const inline = s => s.replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<i>$2</i>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
@@ -979,7 +1002,7 @@ function parseJSONLoose(t){ const tries = [t]; const f = String(t).match(/```(?:
   for (const x of tries) { try { return JSON.parse(x); } catch(_){} } return undefined; }
 
 /* ============ state & data ============ */
-const COLS = ['meta','plans','courses','topics','paths','tasks','done','research','news','problems','categories','tracks','jarvis','sessions','trends','usage','hermes'];
+const COLS = ['meta','plans','courses','topics','paths','tasks','done','research','buckets','instagram','news','problems','categories','tracks','jarvis','sessions','trends','usage','hermes'];
 const S = { db:null, sample:null, mcp:null, dict:null, tts:null, downloads:null, col:Object.fromEntries(COLS.map(c => [c, new Map()])), loaded:{},
   tab: LS.get('tab','today'), sub: LS.get('sub','topics'), day: today(), course: null, speak: LS.get('speak', true), jBusy:false };
 const C = n => S.col[n];
@@ -1234,6 +1257,83 @@ renderers.push(function courses_(){
 $$('#subtabs button').forEach(b => b.onclick = () => { S.sub = b.dataset.sub; LS.set('sub', S.sub); render(); });
 const STATUS = {suggested:['Suggested','var(--st-sugg)'], todo:['To learn','var(--st-todo)'], learning:['Learning','var(--st-learning)'], learned:['Learned','var(--st-learned)']};
 let libFilter = LS.get('libFilter', 'active');
+let aiVideoPicks = null, aiVideoPicksLoading = false;
+function loadAiVideoPicks(){ if (aiVideoPicks || aiVideoPicksLoading) return; aiVideoPicksLoading = true; fetch('ai-video-picks.json').then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); }).then(d => { aiVideoPicks = d; }).catch(() => { aiVideoPicks = {videos:[],playlists:[]}; }).finally(() => { aiVideoPicksLoading = false; if (S.tab === 'library' && S.sub === 'videos') render(); }); }
+const CURATION_TYPES = ['Tool','Tutorial','Workflow','Project','Paper / article','Course','Dataset','Prompt','Product','Inspiration','News','Idea','Other'];
+function readLinkLines(text){
+  const rows = String(text||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean), links=[], invalid=[];
+  for (const row of rows) { const i=row.indexOf('|'), label=i>=0?row.slice(0,i).trim():''; const raw=(i>=0?row.slice(i+1):row).trim(), url=safeUrl(raw); if(!url) invalid.push(row); else links.push({label:label||url,url}); }
+  return {links,invalid};
+}
+function linkLinesText(items){ return (items||[]).map(x => x.label && x.label !== x.url ? `${x.label} | ${x.url}` : x.url).join('\n'); }
+function curationSelect(selected, attr){ return `<select class="inp" ${attr}>${CURATION_TYPES.map(k=>`<option ${k===selected?'selected':''}>${esc(k)}</option>`).join('')}</select>`; }
+function openCurationEditor(area, item){
+  const ig=area==='instagram', coll=ig?'instagram':'buckets', existing=item||{}, id=existing.id||`${ig?'ig':'bucket'}-${slug(existing.title||'item')}-${rid()}`;
+  const kindAttr=ig?'data-ig-kind':'data-bucket-kind';
+  openModal(`<h3>${ig?(item?'Edit Instagram Reel':'Save Instagram Reel'):(item?'Edit bucket item':'Add to My Buckets')}</h3>
+    <form id="curationForm">
+      <div class="field"><span class="label">${ig?'Title / what is this Reel about?':'Title'}</span><input class="inp" id="curationTitle" required maxlength="180" value="${esc(existing.title||'')}" placeholder="${ig?'e.g. RAG explained with a practical demo':'e.g. LangGraph — agent framework'}"></div>
+      <div class="field"><span class="label">${ig?'Instagram Reel URL':'Main link (optional)'}</span><input class="inp" id="curationUrl" type="url" value="${esc(existing.url||'')}" placeholder="https://${ig?'www.instagram.com/reel/...':'example.com/resource'}" ${ig?'required':''}></div>
+      <div class="field"><span class="label">${ig?'Your starting classification':'Classify it'}</span>${curationSelect(existing.kind||'Other',kindAttr)}<span class="faint" style="font-size:12px">${ig?'Research can add a separate AI classification from the caption, transcript, and checked sources.':'Choose the closest type; change it any time.'}</span></div>
+      ${ig?`<div class="field"><span class="label">Caption or transcript (if available)</span><textarea class="inp" id="curationCaption" rows="4" placeholder="Paste the Reel caption or transcript so research can use what was actually said.">${esc(existing.caption||'')}</textarea></div>`:''}
+      <div class="field"><span class="label">${ig?'Your context / what you want researched':'Notes / why you saved it'}</span><textarea class="inp" id="curationNotes" rows="3" placeholder="Key idea, question, or your notes">${esc(existing.notes||'')}</textarea></div>
+      <div class="field"><span class="label">Additional resource links</span><textarea class="inp" id="curationResources" rows="3" ${ig?'data-ig-resources':'data-bucket-resources'} placeholder="One URL per line, or Label | URL">${esc(linkLinesText(existing.resources))}</textarea><span class="faint" style="font-size:12px">Add articles, papers, tools, repos, or any sources mentioned in the Reel.</span></div>
+      <div class="row" style="justify-content:flex-end"><button type="button" class="btn ghost" data-close>Cancel</button><button class="btn primary" type="submit">Save</button></div>
+    </form>`,()=>{
+      $('#curationForm').onsubmit=async e=>{e.preventDefault();
+        const title=$('#curationTitle').value.trim(), rawUrl=$('#curationUrl').value.trim(), url=safeUrl(rawUrl), kind=$(`[${kindAttr}]`).value;
+        if(!title){toast('Add a title first.');return;}
+        if(rawUrl&&!url){toast('Use a full http:// or https:// link.');return;}
+        if(ig&&(!url||!/^https?:\/\/(?:www\.|m\.)?instagram\.com\//i.test(url))){toast('Paste a public Instagram Reel or post link.');return;}
+        const parsed=readLinkLines($('#curationResources').value); if(parsed.invalid.length){toast('Each resource needs a full http:// or https:// link.');return;}
+        const data={title,url,kind,notes:$('#curationNotes').value.trim(),resources:parsed.links,source:ig?'instagram':'manual',created:existing.created||nowIso(),updated:nowIso()};
+        if(ig)data.caption=$('#curationCaption').value.trim();
+        await put(coll,id,data); closeModal(); render(); toast(ig?'Instagram link saved.':'Added to My Buckets.');
+      };
+    });
+}
+function curationResources(items){ return (items||[]).map(r=>{const u=safeUrl(r.url);return u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(r.label||u)}</a>`:''}).filter(Boolean).join(' · '); }
+function curationCard(item, ig){
+  const u=safeUrl(item.url), sources=curationResources(item.resources);
+  return `<article class="card" style="margin-bottom:10px"><div class="sec-h"><h3>${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(item.title)}</a>`:esc(item.title)}</h3><div class="row" style="gap:5px"><span class="pill">${esc(item.kind||'Other')}</span>${ig&&item.aiKind?`<span class="pill">AI: ${esc(item.aiKind)}</span>`:''}</div></div>
+    ${ig&&item.aiKindReason?`<p class="faint" style="font-size:12.5px;margin:4px 0">AI classification: ${esc(item.aiKindReason)}</p>`:''}${item.notes?`<p class="muted" style="font-size:13.5px;margin:4px 0">${esc(item.notes)}</p>`:''}${ig&&item.caption?`<details style="margin:7px 0"><summary class="faint">Caption / transcript</summary><p class="muted" style="font-size:13px;white-space:pre-wrap;margin-top:6px">${esc(item.caption)}</p></details>`:''}
+    ${sources?`<div class="faint" style="font-size:12.5px;margin-top:8px"><b>Resources:</b> ${sources}</div>`:''}
+    <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn small ghost" ${ig?'data-ig-research':'data-bucket-edit'}="${esc(item.id)}">${ig?'Research this Reel':'Edit'}</button>${ig?`<button class="btn small ghost" data-ig-edit="${esc(item.id)}">Edit</button>`:''}<button class="btn small ghost" ${ig?'data-ig-delete':'data-bucket-delete'}="${esc(item.id)}">Delete</button></div></article>`;
+}
+function renderManualBuckets(el){
+  const items=[...C('buckets').values()].sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="sec-h"><div><h3>My Buckets · saved manually</h3><p class="faint" style="font-size:13px;margin-top:5px">Separate from Brain's learning backlog and separate from Instagram. Save tools, papers, courses, prompts, projects, and other links; classify and edit them later.</p></div><button class="btn primary" data-bucket-add>＋ Add item</button></div>
+    <div class="row"><input class="inp" id="bucketSearch" placeholder="Search your saved items" style="flex:1 1 190px"><select class="inp" id="bucketFilter" style="width:auto;min-width:150px"><option value="all">All classifications</option>${CURATION_TYPES.map(k=>`<option>${esc(k)}</option>`).join('')}</select><span class="faint">${items.length} saved</span></div></div>
+    <div id="bucketCards"></div>`;
+  const draw=()=>{const q=$('#bucketSearch').value.trim().toLowerCase(), kind=$('#bucketFilter').value;const shown=items.filter(x=>(kind==='all'||x.kind===kind)&&(!q||[x.title,x.notes,x.kind,x.url].join(' ').toLowerCase().includes(q)));$('#bucketCards').innerHTML=shown.map(x=>curationCard(x,false)).join('')||'<div class="empty">No items match yet. Add a tool, paper, link, or idea to start your personal buckets.</div>'; $$('#bucketCards [data-bucket-edit]').forEach(b=>b.onclick=()=>openCurationEditor('bucket',C('buckets').get(b.dataset.bucketEdit))); $$('#bucketCards [data-bucket-delete]').forEach(b=>b.onclick=()=>{const x=C('buckets').get(b.dataset.bucketDelete);if(x)confirmBox(`Delete “${esc(x.title)}” from My Buckets?`,'Delete',()=>del('buckets',x.id));});};
+  $('[data-bucket-add]').onclick=()=>openCurationEditor('bucket'); $('#bucketSearch').oninput=draw; $('#bucketFilter').onchange=draw; draw();
+}
+function instagramResearchNote(item){
+  return [`Instagram Reel URL: ${item.url}`,`User classification: ${item.kind||'Other'}`,item.caption?`User-provided caption / transcript:\n${item.caption}`:'',item.notes?`User context / research question:\n${item.notes}`:'',(item.resources||[]).length?`Additional resources supplied by the user:\n${item.resources.map(x=>`- ${x.label}: ${x.url}`).join('\n')}`:'','Use the supplied Reel context and links as leads. Verify claims using accessible primary sources; clearly separate Reel claims from independently verified facts and cite each source URL. Do not claim to have watched inaccessible/private Reel content.'].filter(Boolean).join('\n\n');
+}
+async function queueInstagramResearch(item){
+  if(!item){toast('Instagram Reel not found.');return;}
+  const old=[...C('research').values()].filter(r=>r.source==='instagram'&&r.igId===item.id).sort((a,b)=>String(b.created||'').localeCompare(String(a.created||'')))[0];
+  const id=old?.id||`ig-research-${slug(item.title)}-${rid()}`;
+  await put('research',id,{...(old||{}),query:item.title||item.url,mode:'learn',note:instagramResearchNote(item),source:'instagram',igId:item.id,status:'pending',created:old?.created||nowIso(),history:old?.history||[]});
+  S.sub='ig-research';LS.set('sub',S.sub);render();const ok=await fireBot('daily');toast(ok?'Instagram research queued. The researched dossier will appear in Instagram Research.':'Instagram research queued for the next daily research run.');
+}
+function renderInstagram(el){
+  const items=[...C('instagram').values()].sort((a,b)=>String(b.updated||b.created||'').localeCompare(String(a.updated||a.created||'')));
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="sec-h"><div><h3>Instagram Links</h3><p class="faint" style="font-size:13px;margin-top:5px">Save Reels/posts separately from My Buckets, classify what each is about, and attach related sources. Instagram may block automated access: paste the caption/transcript or your notes for accurate research. No login scraping.</p></div><button class="btn primary" data-ig-add>＋ Add Reel</button></div><span class="faint" style="font-size:12px">${items.length} saved links</span></div><div id="igCards"></div>`;
+  $('#igCards').innerHTML=items.map(x=>curationCard(x,true)).join('')||'<div class="empty">No Instagram links yet. Add a Reel URL, then include its caption or resources when available.</div>';
+  $('[data-ig-add]').onclick=()=>openCurationEditor('instagram');
+  $$('#igCards [data-ig-edit]').forEach(b=>b.onclick=()=>openCurationEditor('instagram',C('instagram').get(b.dataset.igEdit)));
+  $$('#igCards [data-ig-research]').forEach(b=>b.onclick=()=>queueInstagramResearch(C('instagram').get(b.dataset.igResearch)));
+  $$('#igCards [data-ig-delete]').forEach(b=>b.onclick=()=>{const x=C('instagram').get(b.dataset.igDelete);if(x)confirmBox(`Delete “${esc(x.title)}” from Instagram Links? Any existing research dossier will remain in Instagram Research.`,'Delete',()=>del('instagram',x.id));});
+}
+function renderInstagramResearch(el){
+  const rs=[...C('research').values()].filter(r=>r.source==='instagram').sort((a,b)=>String(b.researched||b.created||'').localeCompare(String(a.researched||a.created||'')));
+  el.innerHTML=`<div class="card" style="margin-bottom:14px"><div class="sec-h"><div><h3>Instagram Research</h3><p class="faint" style="font-size:13px;margin-top:5px">Research dossiers for Instagram links only. Use the Research button on a saved Reel to queue one; user-provided captions, notes, and resource URLs travel with it.</p></div><span class="pill">${rs.length} dossiers</span></div></div>`+
+    (rs.length?rs.map(r=>{const d=r.dossier||{},ig=C('instagram').get(r.igId),title=d.title||r.query||ig?.title||'Instagram research';return `<details class="acc"><summary><span class="t">${esc(title)}</span><span class="pill">${esc(r.status||'pending')}</span></summary><div class="in"><p class="faint" style="font-size:13px">${ig?`Reel: <a href="${esc(safeUrl(ig.url))}" target="_blank" rel="noopener">${esc(ig.title)}</a> · ${esc(ig.kind||'Other')}`:esc(r.note||'')}</p>${d.summary?`<p><b>${esc(d.summary)}</b></p>`:''}${d.relevance?`<p class="faint">Relevance: ${esc(d.relevance.verdict||'')}</p>`:''}${md(d.what||'')}${(d.sources||d.references||[]).length?`<h5>Sources</h5><ul>${(d.sources||d.references).map(x=>`<li><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title||x.label||x.url)}</a></li>`).join('')}</ul>`:''}<div class="row" style="justify-content:flex-end;margin-top:10px">${ig?`<button class="btn small ghost" data-ig-rerun="${esc(r.id)}">Research again</button>`:''}<button class="btn small ghost" data-ig-rdel="${esc(r.id)}">Delete dossier</button></div></div></details>`;}).join(''):'<div class="empty">No Instagram dossiers yet. Save a Reel, add any caption/resources you have, then choose Research this Reel.</div>');
+  $$('#libBody [data-ig-rerun]').forEach(b=>b.onclick=()=>queueInstagramResearch(C('instagram').get(C('research').get(b.dataset.igRerun)?.igId)));
+  $$('#libBody [data-ig-rdel]').forEach(b=>b.onclick=()=>{const r=C('research').get(b.dataset.igRdel);if(r)confirmBox('Delete this Instagram research dossier? The saved Reel link will remain.','Delete',()=>del('research',r.id));});
+}
 renderers.push(function library_(){
   if (S.tab !== 'library') return;
   $$('#subtabs button').forEach(b => b.classList.toggle('on', b.dataset.sub === S.sub));
@@ -1268,12 +1368,23 @@ renderers.push(function library_(){
     $$('#libBody [data-pname]').forEach(b => b.onclick = () => editList(b, 'pname'));
     $$('#libBody .check[data-k]').forEach(x => x.onchange = () => { const col = x.dataset.k === 'path' ? 'paths' : 'tracks'; const doc = C(col).get(x.dataset.id); if (!doc) return; const steps = (doc.steps||[]).map((st, i) => i === +x.dataset.i ? Object.assign({}, st, {done: x.checked}) : st); patch(col, doc.id, {steps}); if (x.checked) recordDone('step', doc.id+'-'+x.dataset.i, steps[+x.dataset.i].t, 0); });
   }
+  else if (s === 'buckets') renderManualBuckets(el);
+  else if (s === 'instagram') renderInstagram(el);
+  else if (s === 'ig-research') renderInstagramResearch(el);
   else if (s === 'research') {
-    const rs = [...C('research').values()].sort((a,b) => String(b.researched||b.created||'').localeCompare(String(a.researched||a.created||'')));
+    const rs = [...C('research').values()].filter(r => r.source !== 'instagram').sort((a,b) => String(b.researched||b.created||'').localeCompare(String(a.researched||a.created||'')));
     el.innerHTML = `<div class="card" style="margin-bottom:14px"><div class="sec-h"><h3>Research something</h3></div><div class="row"><input class="inp" id="rq" placeholder="A tool, idea or paper to investigate" style="flex:1 1 220px"><button class="btn primary" id="rqGo">Research</button></div><p class="faint" style="font-size:13px;margin-top:6px">The daily Claude job does real web research and writes a dossier here.</p></div>`
       + (rs.length ? rs.map(r => { const d = r.dossier || {}; return `<details class="acc"><summary><span class="t">${esc(d.title || r.query)}</span><span class="pill" style="--c:${r.status === 'done' ? 'var(--good)' : 'var(--accent)'}">${esc(r.status||'')}</span></summary><div class="in md">${d.summary ? `<p><b>${esc(d.summary)}</b></p>` : ''}${d.relevance ? `<p class="faint">Worth it for you: ${esc(d.relevance.score)}/5 · ${esc(d.relevance.verdict||'')}</p>` : ''}${md(d.what || '')}${(d.how_to_learn||[]).length ? `<h5>How to learn it</h5><ol>${d.how_to_learn.map(x => `<li>${esc(x.t)}${x.minutes ? ' · '+fmtMin(x.minutes) : ''}</li>`).join('')}</ol>` : ''}<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn small ghost" data-rdel="${esc(r.id)}">Delete</button></div></div></details>`; }).join('') : '<div class="empty">No research yet.</div>');
     $$('#libBody [data-rdel]').forEach(b => b.onclick = () => { const r = C('research').get(b.dataset.rdel); if (r) confirmBox(`Delete the research "${esc(r.dossier?.title || r.query)}"?`, 'Delete', () => del('research', r.id)); });
     $('#rqGo').onclick = async () => { const v = $('#rq').value.trim(); if (!v) return; await put('research', slug(v)+'-'+rid(), {query:v, mode:'learn', note:'', status:'pending', created: nowIso(), history:[]}); $('#rq').value = ''; const ok = await fireBot('daily'); toast(ok ? 'Researching now. Check back in a few minutes.' : 'Queued for the next daily run.'); };
+  }
+  else if (s === 'videos') {
+    if (!aiVideoPicks) { el.innerHTML = '<div class="status"><span class="spin"></span> Loading curated AI videos and playlists…</div>'; loadAiVideoPicks(); return; }
+    const videos = aiVideoPicks.videos || [], playlists = aiVideoPicks.playlists || [];
+    const thumb = id => /^[A-Za-z0-9_-]{11}$/.test(id||'') ? `<img loading="lazy" src="https://img.youtube.com/vi/${esc(id)}/hqdefault.jpg" alt="YouTube thumbnail" onerror="this.hidden=true">` : '<div style="aspect-ratio:16/9;background:linear-gradient(135deg,var(--panel-2),var(--bg-2));display:grid;place-items:center;color:var(--accent);font-size:30px" aria-hidden="true">▶</div>';
+    const videoCard = v => `<article class="yt-rec">${thumb(v.id)}<div class="yt-copy"><span class="pill yt-phase">${esc(v.phase||'AI learning')}</span><div class="yt-title"><a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">${esc(v.title)}</a></div><div class="yt-meta">${esc(v.channel||'YouTube')} · ${esc(v.level||'')} · ${fmtMin(v.minutes||0)}</div><p class="yt-why">${esc(v.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">▶ Watch video</a></div></article>`;
+    const playlistCard = p => `<article class="yt-rec">${thumb(p.firstVideoId)}<div class="yt-copy"><span class="pill yt-phase">${esc(p.phase||'Playlist')}</span><div class="yt-title"><a href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">${esc(p.title)}</a></div><div class="yt-meta">${esc(p.channel||'YouTube')} · Playlist</div><p class="yt-why">${esc(p.why||'')}</p><a class="btn small ghost" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">▶ Open playlist</a></div></article>`;
+    el.innerHTML = `<div class="card yt-guide"><b>Your watch order:</b> start with a visual explanation, then build along with the code-first courses. Treat videos as companions to the AI Builder Path—not a replacement for running the projects. No maths drills required.</div><section class="yt-section"><div class="sec-h"><h3>Recommended playlists</h3><span class="faint">${playlists.length} curated</span></div><div class="yt-grid">${playlists.map(playlistCard).join('')}</div></section><section class="yt-section"><div class="sec-h"><h3>Recommended individual videos</h3><span class="faint">${videos.length} curated</span></div><div class="yt-grid">${videos.map(videoCard).join('')}</div></section><p class="faint" style="font-size:12px;margin-top:12px">Recommendations are selected for your practical, no-maths learning path. YouTube links may change; if a link stops working, use the edit controls in Paths to replace it.</p>`;
   }
   else if (s === 'dsa') {
     const ps = [...C('problems').values()].sort((a,b) => (a.step||0)-(b.step||0) || String(a.id).localeCompare(String(b.id), undefined, {numeric:true}));
@@ -1325,6 +1436,7 @@ $('#settingsBtn').onclick = () => { const p = profile(); const m = C('meta').get
       <div class="row"><select class="inp" id="sVoice" style="flex:1 1 200px"></select><button class="btn small" id="sTest">▶ Test</button></div>
       <span class="faint" style="font-size:12.5px">Voices come from your device. Chrome and Edge on a PC have the most (look for "UK English", "Daniel", "Libby", "Ryan"). On Android phones Chrome usually offers one voice per language: to get a male voice, open Android Settings → Text-to-speech output → Google engine ⚙ → Install voice data → English (UK/India/US) → pick a male voice; Jarvis will then use it.</span>
       <label class="row" style="gap:8px;font-size:13.5px"><input type="checkbox" class="check" id="sDeep" ${LS.get('deepenVoice', true) ? 'checked' : ''}> Deepen the voice for male personas when the device has no male voice</label></div>
+    <div class="card" style="margin-bottom:12px"><div class="sec-h"><h3>Daily reminders</h3><button type="button" class="btn small ghost" id="sAddReminder">＋ Add</button></div><p class="faint" style="font-size:12.5px;margin-bottom:8px">Suggested defaults: Naam Jaap, a water/stretch break and a small AI-learning session. Set your own times. The app must be open; browser notifications are optional.</p><div id="sReminders"></div><button type="button" class="btn small ghost" id="sAllowNotify" style="margin-top:8px">Enable browser notifications</button><span id="sNotifyState" class="faint" style="font-size:12px;margin-left:8px"></span></div>
     <div class="card" style="background:var(--bg-2)"><div class="label">Daily Claude job</div><p style="font-size:14px;margin-top:6px">${m.lastRun ? 'Last ran '+esc(new Date(m.lastRun).toLocaleString()) : 'Not run yet'}. It finds course videos, builds study kits, researches and adds news every morning.</p>${m.lastDigest ? `<p class="faint" style="font-size:13px;margin-top:6px">${esc(m.lastDigest)}</p>` : ''}<div class="row" style="margin-top:10px"><button class="btn small" id="sRun" ${botReady('daily') ? '' : 'disabled'}>Run it now</button><button class="btn small ghost" id="sMic">🎙 Mic check</button><button class="btn small ghost" id="sAudit">🧾 Token audit</button>${S.downloads ? '<button class="btn small ghost" id="sBackup">Download a backup</button>' : ''}</div></div>
     <div class="row" style="justify-content:flex-end"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" id="sSave">Save</button></div>`, () => {
     const drawStudio = () => { const P = persona(); loadVoices();
@@ -1337,12 +1449,18 @@ $('#settingsBtn').onclick = () => { const p = profile(); const m = C('meta').get
       $$('#sPersonas [data-prev]').forEach(b => b.onclick = () => { const p = PERSONAS.find(x => x.id === b.dataset.prev); previewP = p; say(p.hello, true); });
     };
     const applyVoice = () => { const P = persona(); const v = $('#sVoice').value; if (v.startsWith('__claude:')) { VOICE.mode = 'claude'; LS.set('claudeVoice', v.split(':')[1]); } else { VOICE.mode = 'device'; LS.set('voiceName.'+P.id, v); } LS.set('voiceMode', VOICE.mode); LS.set('voiceMode.'+P.id, VOICE.mode); };
-    drawStudio();
+    let reminderDraft = getDailyReminders().map(x => ({...x}));
+    const collectReminderDraft = () => $$('#sReminders .reminder-row').map(row => ({id:row.dataset.id, title:row.querySelector('[data-rtitle]').value.trim()||'Daily reminder', time:row.querySelector('[data-rtime]').value||'09:00', enabled:row.querySelector('[data-renabled]').checked}));
+    const drawReminderDraft = () => { $('#sReminders').innerHTML = reminderDraft.map((r,i) => `<div class="row reminder-row" data-id="${esc(r.id)}" style="gap:8px;margin:6px 0"><input class="check" type="checkbox" data-renabled ${r.enabled ? 'checked' : ''} aria-label="Enable reminder"><input class="inp" data-rtitle value="${esc(r.title)}" aria-label="Reminder name" style="flex:1 1 150px"><label class="faint" style="font-size:12px">Reminder time <input class="inp" data-rtime type="time" value="${esc(r.time)}" aria-label="Reminder time" style="width:auto;padding:5px"></label><button type="button" class="x" data-rdel="${i}" aria-label="Remove reminder">×</button></div>`).join(''); $$('#sReminders [data-rdel]').forEach(b => b.onclick = () => { reminderDraft = collectReminderDraft(); reminderDraft.splice(+b.dataset.rdel,1); drawReminderDraft(); }); };
+    drawStudio(); drawReminderDraft();
+    $('#sAddReminder').onclick = () => { reminderDraft = collectReminderDraft(); reminderDraft.push({id:'custom-'+Date.now(),title:'New reminder',time:'09:00',enabled:true}); drawReminderDraft(); };
+    $('#sAllowNotify').onclick = async () => { if (!('Notification' in window)) { $('#sNotifyState').textContent = 'Not supported by this browser'; return; } try { const permission = await Notification.requestPermission(); $('#sNotifyState').textContent = permission === 'granted' ? 'Enabled' : 'Not enabled'; } catch(e) { $('#sNotifyState').textContent = 'Could not enable'; } };
+    $('#sNotifyState').textContent = 'Permission: ' + (('Notification' in window) ? Notification.permission : 'unsupported');
     $('#sPitch').oninput = e => { LS.set('voicePitch.'+persona().id, Number(e.target.value)); $('#sPitchV').textContent = Number(e.target.value).toFixed(2); };
     $('#sRate').oninput = e => { LS.set('voiceRate.'+persona().id, Number(e.target.value)); $('#sRateV').textContent = Number(e.target.value).toFixed(2); };
     $('#sPitch').onchange = $('#sRate').onchange = () => say(persona().hello, true);
     $('#sVoice').onchange = () => { applyVoice(); say(persona().hello, true); }; $('#sTest').onclick = () => { applyVoice(); say(persona().hello + ' Your study plan is ready.', true); };
-    $('#sSave').onclick = () => { put('meta', 'profile', {name: $('#sName').value.trim(), hours: Number($('#sHours').value)||4, goals: $('#sGoals').value.trim()}); closeModal(); toast('Saved.'); };
+    $('#sSave').onclick = () => { put('meta', 'profile', {name: $('#sName').value.trim(), hours: Number($('#sHours').value)||4, goals: $('#sGoals').value.trim()}); LS.set('dailyReminders', collectReminderDraft()); closeModal(); toast('Saved.'); };
     $('#sDeep') && ($('#sDeep').onchange = (e) => { LS.set('deepenVoice', e.target.checked); say(persona().hello, true); });
     $('#sMic').onclick = () => openMicTest();
     $('#sAudit').onclick = () => openAudit();

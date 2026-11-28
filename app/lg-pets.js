@@ -18,14 +18,14 @@
   .lgpet{position:fixed;z-index:60;right:var(--pet-r,18px);bottom:var(--pet-b,10px);width:${W}px;height:${H}px;cursor:grab;touch-action:none;user-select:none}
   .lgpet.drag{cursor:grabbing}
   .lgpet canvas{width:${W}px;height:${H}px;display:block}
-  .lgpet .x{position:absolute;right:-6px;top:-6px;width:18px;height:18px;border-radius:50%;border:0;background:rgb(10 14 24 / .75);color:#fff;font-size:12px;line-height:18px;cursor:pointer;opacity:0;transition:opacity .2s}
-  .lgpet:hover .x{opacity:1}
+  .lgpet .petctl{position:absolute;top:-7px;width:22px;height:22px;border-radius:50%;border:1px solid rgb(255 255 255 / .3);background:rgb(10 14 24 / .82);color:#fff;font-size:12px;line-height:20px;padding:0;cursor:pointer;opacity:0;transition:opacity .2s}
+  .lgpet .x{right:-7px}.lgpet .walk{right:18px}.lgpet:hover .petctl,.lgpet:focus-within .petctl{opacity:1}
   @media (max-width:1100px){ body.jopen .lgpet{display:none} }
-  @media (max-width:640px){ .lgpet{bottom:calc(74px + env(safe-area-inset-bottom,0px))!important} }`;
+  @media (max-width:640px){ .lgpet{bottom:calc(74px + env(safe-area-inset-bottom,0px))!important}.lgpet .petctl{opacity:.82} }`;
   document.head.appendChild(css);
 
-  const el = document.createElement('div'); el.className = 'lgpet'; el.title = 'Krishna'; el.setAttribute('role', 'img'); el.setAttribute('aria-label', 'Krishna');
-  el.innerHTML = '<canvas></canvas><button class="x" title="Hide Krishna" aria-label="Hide">×</button>';
+  const el = document.createElement('div'); el.className = 'lgpet'; el.title = 'Krishna'; el.setAttribute('role', 'group'); el.setAttribute('aria-label', 'Krishna pet controls');
+  el.innerHTML = '<canvas></canvas><button class="petctl walk" title="Pause Krishna walking" aria-label="Pause Krishna walking">Ⅱ</button><button class="petctl x" title="Send Krishna away" aria-label="Send Krishna away">×</button>';
   document.body.appendChild(el);
   const cv = el.querySelector('canvas'), ctx = cv.getContext('2d');
   const img = new Image(); img.src = 'pets/krishna.webp';
@@ -40,10 +40,11 @@
   let flashT;
   function flash(f, ms = 1600) { Object.assign(flags, { error: false, celebrate: false, justCompleted: false }, f); clearTimeout(flashT); flashT = setTimeout(() => Object.assign(flags, { error: false, celebrate: false, justCompleted: false }), ms); }
   const stateOf = (e) => e.error ? 'failed' : e.celebrate ? 'jump' : e.justCompleted ? 'wave' : e.awaitingInput ? 'waiting' : e.toolRunning ? 'run' : e.reasoning ? 'review' : e.busy ? 'run' : 'idle';
+  let autoWalking = false, walkRow = 'running-right', walkEnd;
 
   /* ---------- draw loop (6 frames / 1100 ms, high-quality smoothing) ---------- */
   function tick(t) {
-    const st = stateOf(flags); const r = Math.min(ROW[st] ?? 0, ROWS.length - 1);
+    const st = stateOf(flags); const r = st === 'idle' && autoWalking ? ROWS.indexOf(walkRow) : Math.min(ROW[st] ?? 0, ROWS.length - 1);
     if (r !== row) { row = r; frame = 0; lastStep = t; }
     if (t - lastStep >= LOOP_MS / FRAMES) { frame = (frame + 1) % FRAMES; lastStep = t; }
     if (img.complete && img.naturalWidth > 0 && (frame !== last || row !== lastRow)) {
@@ -53,6 +54,15 @@
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
+  function walkAround(){
+    if (!LS.get('petWalkEnabled', true) || autoWalking || stateOf(flags) !== 'idle' || innerWidth < 500) return;
+    const cs = getComputedStyle(el), from = parseFloat(cs.right), bottom = parseFloat(cs.bottom), max = Math.max(16, innerWidth - W - 16);
+    let to = Math.round(Math.random() * max); if (Math.abs(to - from) < 120) to = from < max / 2 ? max : 16;
+    walkRow = to < from ? 'running-right' : 'running-left'; autoWalking = true; clearTimeout(walkEnd);
+    el.style.transition = 'right 5s linear'; el.style.setProperty('--pet-r', to + 'px');
+    walkEnd = setTimeout(() => { autoWalking = false; el.style.transition = ''; LS.set('petPos', {r:to,b:bottom}); }, 5200);
+  }
+  setInterval(walkAround, 30000);
 
   /* ---------- follow the app ---------- */
   addEventListener('lg-celebrate', () => flash({ celebrate: true }));
@@ -74,27 +84,28 @@
   /* ---------- place (left of Jarvis on desktop) + drag ---------- */
   let drag = null, moved = false;
   function place() {
-    if (drag) return;
+    if (drag || autoWalking) return;
     const pos = LS.get('petPos', null);
     if (pos && innerWidth > 640) { el.style.setProperty('--pet-r', Math.max(0, Math.min(innerWidth - W, pos.r)) + 'px'); el.style.setProperty('--pet-b', Math.max(0, Math.min(innerHeight - H, pos.b)) + 'px'); return; }
     const j = document.querySelector('#jarvis'); const r = j && innerWidth > 1100 && getComputedStyle(j).display !== 'none' ? j.getBoundingClientRect() : null;
     el.style.setProperty('--pet-r', (r && r.width ? innerWidth - r.left + 16 : 16) + 'px'); el.style.setProperty('--pet-b', '10px');
   }
   place(); addEventListener('resize', place); setInterval(place, 2500);
-  el.addEventListener('pointerdown', (e) => { if (e.target.classList.contains('x')) return; const cs = getComputedStyle(el); drag = { x: e.clientX, y: e.clientY, r: parseFloat(cs.right), b: parseFloat(cs.bottom) }; moved = false; el.setPointerCapture(e.pointerId); });
+  el.addEventListener('pointerdown', (e) => { if (e.target.classList.contains('petctl')) return; const cs = getComputedStyle(el); drag = { x: e.clientX, y: e.clientY, r: parseFloat(cs.right), b: parseFloat(cs.bottom) }; moved = false; el.setPointerCapture(e.pointerId); });
   el.addEventListener('pointermove', (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 5) { moved = true; el.classList.add('drag'); }
     if (moved) { el.style.setProperty('--pet-r', (drag.r - dx) + 'px'); el.style.setProperty('--pet-b', (drag.b - dy) + 'px'); } });
   el.addEventListener('pointerup', () => { if (drag && moved) { const cs = getComputedStyle(el); LS.set('petPos', { r: parseFloat(cs.right), b: parseFloat(cs.bottom) }); } drag = null; el.classList.remove('drag'); });
   el.addEventListener('click', (e) => {
-    if (e.target.classList.contains('x')) { LS.set('petsOff', true); el.remove(); recall(); return; }
+    if (e.target.classList.contains('x')) { LS.set('petsOff', true); clearTimeout(walkEnd); el.remove(); recall(); return; }
+    if (e.target.classList.contains('walk')) { const on = !LS.get('petWalkEnabled', true); LS.set('petWalkEnabled', on); autoWalking = false; clearTimeout(walkEnd); el.style.transition = ''; e.target.textContent = on ? 'Ⅱ' : '▶'; e.target.title = on ? 'Pause Krishna walking' : 'Let Krishna walk'; e.target.setAttribute('aria-label', e.target.title); e.stopPropagation(); return; }
     if (!moved) flash({ justCompleted: true }, 1600); // tap → he waves, like in Hermes
   });
 
   function recall() {
-    const b = document.createElement('button'); b.textContent = '🦚'; b.title = 'Bring back Krishna';
-    b.style.cssText = 'position:fixed;right:12px;bottom:10px;z-index:59;border:0;background:none;font-size:18px;opacity:.4;cursor:pointer';
-    b.onmouseenter = () => (b.style.opacity = '1'); b.onmouseleave = () => (b.style.opacity = '.4');
-    b.onclick = () => { LS.set('petsOff', false); location.reload(); };
+    const b = document.createElement('button'); b.textContent = '🪈 Bring Krishna back'; b.title = 'Bring Krishna back'; b.setAttribute('aria-label','Bring Krishna back');
+    b.style.cssText = 'position:fixed;right:12px;bottom:10px;z-index:59;border:1px solid rgb(255 255 255 / .25);border-radius:999px;padding:7px 11px;background:rgb(8 15 25 / .9);color:#fff;font:600 12px system-ui;opacity:.78;cursor:pointer;backdrop-filter:blur(8px)';
+    b.onmouseenter = () => (b.style.opacity = '1'); b.onmouseleave = () => (b.style.opacity = '.78');
+    b.onclick = () => { LS.set('petsOff', false); b.remove(); location.reload(); };
     (document.body ? Promise.resolve() : new Promise((r) => addEventListener('DOMContentLoaded', r))).then(() => document.body.appendChild(b));
   }
 })();
