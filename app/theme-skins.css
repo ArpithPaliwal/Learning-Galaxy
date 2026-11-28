@@ -1,0 +1,94 @@
+/* Learning Galaxy — theme skins. Loaded last.
+ * html[data-theme] stays "dark" or "light" (all existing CSS keys off it); html[data-skin] repaints the palette.
+ *   black      Midnight black — true #000 (AMOLED), silver-white accent, minimal glow
+ *   gold       Black & gold   — black lacquer with warm gold accents
+ *   peacock    Peacock night  — deep teal-blue with peacock green + gold (Krishna's feather)
+ *   vrindavan  Vrindavan dawn — warm cream, lotus pink, peacock blue and saffron (light) */
+
+html.theme-anim body,html.theme-anim .card,html.theme-anim .top,html.theme-anim .jarvis,html.theme-anim .btn{transition:background-color .5s,background .5s,color .4s,border-color .4s,box-shadow .5s}
+
+/* ---------------- Midnight black ---------------- */
+html[data-skin="black"]{
+  --bg:#000; --bg-2:#050505; --panel:#0b0b0c; --panel-2:#121214; --line:#1c1c1f; --line-2:#2a2a2e;
+  --fg:#F4F4F5; --fg-2:#A1A1AA; --fg-3:#6B6B74;
+  --accent:#F4F4F5; --accent-2:#FFFFFF; --accent-ink:#000; --deep:#D4D4D8; --ion:#E4E4E7;
+  --glow:rgb(255 255 255 / .18); --glow-soft:rgb(255 255 255 / .06);
+  --st-learned:#FFFFFF; --st-learning:#D4D4D8; --st-todo:#52525B; --st-sugg:#27272A;
+  --c-acc:244 244 245; --c-ion:228 228 231; --c-deep:212 212 216; --c-s0:0 0 0; --c-s1:11 11 12;
+  --g-fill:rgb(14 14 16 / .72); --g-fill-2:rgb(18 18 20 / .86); --g-line:rgb(255 255 255 / .08); --g-hi:rgb(255 255 255 / .05);
+  --g-shadow:0 18px 50px -24px rgb(0 0 0 / .9), 0 1px 0 0 rgb(255 255 255 / .04) inset;
+}
+html[data-skin="black"] body{background:#000 fixed!important}
+html[data-skin="black"] #bgfx,html[data-skin="black"] .fx{opacity:.35}
+html[data-skin="black"] .now{background:linear-gradient(160deg,#151517,#050505)!important}
+
+/* ---------------- Black & gold ---------------- */
+html[data-skin="gold"]{
+  --bg:#050403; --bg-2:#0b0906; --panel:#100d08; --panel-2:#17130b; --line:#2a2214; --line-2:#4a3a1c;
+  --fg:#FBF3E0; --fg-2:#D7C49A; --fg-3:#8F7B55;
+  --accent:#E8B54A; --accent-2:#F6D27A; --accent-ink:#1a1204; --deep:#B8862B; --ion:#F0C35E;
+  --glow:rgb(232 181 74 / .40); --glow-soft:rgb(232 181 74 / .10);
+  --st-learned:#F6D27A; --st-learning:#E8B54A; --st-todo:#7A5F2C; --st-sugg:#3A2E17;
+  --c-acc:232 181 74; --c-ion:240 195 94; --c-deep:184 134 43; --c-s0:5 4 3; --c-s1:16 13 8;
+  --g-fill:rgb(22 17 9 / .62); --g-fill-2:rgb(26 20 10 / .82); --g-line:rgb(232 181 74 / .16); --g-hi:rgb(255 230 170 / .07);
+  --g-shadow:0 18px 50px -24px rgb(0 0 0 / .85), 0 1px 0 0 rgb(255 220 150 / .07) inset;
+}
+html[data-skin="gold"] body{background:
+  radial-gradient(900px 600px at 15% 0%,rgb(232 181 74 / .10),transparent 60%),
+  radial-gradient(800px 600px at 90% 100%,rgb(184 134 43 / .10),transparent 60%),#050403 fixed!important}
+html[data-skin="gold"] .now{background:linear-gradient(160deg,#2a1f0c,#0b0805)!important;border-color:rgb(232 181 74 / .3)!important}
+html[data-skin="gold"] h1,html[data-skin="gold"] .bz-views button.on{letter-spacing:.01em}
+
+/* ---------------- Peacock night ---------------- */
+html[data-skin="peacock"]{
+  --bg:#02100f; --bg-2:#04191a; --panel:#062224; --panel-2:#0a2e30; --line:#0f3b3d; --line-2:#185a5b;
+  --fg:#E6FBF7; --fg-2:#9FD3CB; --fg-3:#5E9690;
+  --accent:#2FD3C0; --accent-2:#7FF0E1; --accent-ink:#01201d; --deep:#1A8FA8; --ion:#E9C46A;
+  --glow:rgb(47 211 192 / .40); --glow-soft:rgb(47 211 192 / .12);
+  --st-learned:#E9C46A; --st-learning:#2FD3C0; --st-todo:#1D6E78; --st-sugg:#103C40;
+  --c-acc:47 211 192; --c-ion:233 196 106; --c-deep:26 143 168; --c-s0:2 16 15; --c-s1:6 34 36;
+  --g-fill:rgb(8 44 48 / .45); --g-fill-2:rgb(10 52 56 / .62); --g-line:rgb(127 240 225 / .14); --g-hi:rgb(255 255 255 / .07);
+}
+html[data-skin="peacock"] body{background:
+  radial-gradient(900px 600px at 10% 10%,rgb(26 143 168 / .25),transparent 60%),
+  radial-gradient(700px 500px at 90% 20%,rgb(47 211 192 / .14),transparent 60%),
+  radial-gradient(800px 700px at 60% 100%,rgb(70 40 140 / .22),transparent 60%),#010b0b fixed!important}
+html[data-skin="peacock"] .now{background:linear-gradient(160deg,#0d4d55,#04191a)!important}
+
+/* ---------------- Vrindavan dawn (light) ---------------- */
+html[data-skin="vrindavan"]{
+  --bg:#FFF6E5; --bg-2:#FCEFD6; --panel:#FFFBF2; --panel-2:#FFF4E0; --line:#F1DFC0; --line-2:#E6C995;
+  --fg:#3A1F14; --fg-2:#7A4B33; --fg-3:#A8806A;
+  --accent:#D6336C; --accent-2:#B5235A; --accent-ink:#FFFFFF; --deep:#1F5FA8; --ion:#2A8FD0;
+  --glow:rgb(214 51 108 / .22); --glow-soft:rgb(214 51 108 / .08);
+  --good:#3F8F3A; --warn:#E08A1E; --crit:#C9302C;
+  --st-learned:#E0A21E; --st-learning:#D6336C; --st-todo:#C9A27A; --st-sugg:#EFDDBF;
+  --c-acc:214 51 108; --c-ion:42 143 208; --c-deep:31 95 168; --c-s0:255 251 242; --c-s1:255 244 224;
+  --g-fill:rgb(255 251 240 / .62); --g-fill-2:rgb(255 250 238 / .80); --g-line:rgb(255 255 255 / .9); --g-hi:rgb(255 255 255 / .95);
+  --g-shadow:0 16px 40px -22px rgb(150 80 30 / .28), 0 1px 0 0 rgb(255 255 255 / .95) inset;
+}
+html[data-skin="vrindavan"] body{background:
+  radial-gradient(520px 520px at 82% 12%,rgb(255 214 120 / .55),transparent 62%),
+  radial-gradient(800px 500px at 8% 0%,rgb(255 190 200 / .35),transparent 60%),
+  radial-gradient(900px 500px at 50% 112%,rgb(150 190 90 / .35),transparent 60%),#FFF3DC fixed!important}
+html[data-skin="vrindavan"] .now{background:linear-gradient(150deg,#1F5FA8,#2A8FD0 55%,#7FC6E8)!important;color:#fff}
+html[data-skin="vrindavan"] .now *{color:inherit}
+html[data-skin="vrindavan"] .bl{color:#5a2e1c;text-shadow:0 0 6px #fff8ea,0 0 2px #fff8ea!important}
+html[data-skin="vrindavan"] .bz-stage{background:radial-gradient(ellipse at 50% 45%,rgb(255 214 120 / .25),transparent 70%),rgb(255 251 240 / .4)}
+
+/* ---------------- theme picker popover ---------------- */
+.lg-themepop{position:fixed;z-index:120;width:230px;padding:8px;border-radius:16px;display:flex;flex-direction:column;gap:2px;
+  background:linear-gradient(150deg,var(--g-hi,rgb(255 255 255 / .1)),transparent 40%),var(--g-fill-2,var(--panel))!important;border:1px solid var(--g-line,var(--line));
+  box-shadow:0 24px 60px -20px rgb(0 0 0 / .6);-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);animation:lgpop .16s ease-out}
+.lg-themepop .label{padding:4px 8px 6px}
+.lg-themepop button{display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--fg);padding:7px 8px;border-radius:10px;cursor:pointer;font:500 13.5px var(--f-body);text-align:left}
+.lg-themepop button:hover{background:rgb(127 127 127 / .12)}
+.lg-themepop button.on{background:color-mix(in srgb,var(--accent) 16%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent)}
+.lg-themepop i{width:22px;height:22px;border-radius:50%;flex:none;box-shadow:0 0 0 1px rgb(127 127 127 / .35)}
+@keyframes lgpop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+
+/* Jarvis panel per skin (theme-glass paints it night-blue for all dark themes) */
+html[data-skin="black"] .jarvis{background:linear-gradient(180deg,#0c0c0d,#000 45%)!important}
+html[data-skin="gold"] .jarvis{background:linear-gradient(180deg,rgb(70 50 16 / .40),rgb(8 6 3 / .88) 45%)!important}
+html[data-skin="peacock"] .jarvis{background:linear-gradient(180deg,rgb(20 100 100 / .35),rgb(2 16 15 / .82) 45%)!important}
+html[data-skin="vrindavan"] .jarvis{background:rgb(255 248 232 / .72)!important}

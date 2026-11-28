@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Galaxy">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<script>(function(){var t=null;try{t=JSON.parse(localStorage.getItem('lg.app.theme')||'null');}catch(e){}var h=document.documentElement.getAttribute('data-theme');if(t!=='light'&&t!=='dark')t=(h==='light'||h==='dark')?h:matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<script>(function(){var t=null;try{t=JSON.parse(localStorage.getItem('lg.app.theme')||'null');}catch(e){}var M={dark:['dark',''],light:['light',''],black:['dark','black'],gold:['dark','gold'],peacock:['dark','peacock'],vrindavan:['light','vrindavan']};var d=document.documentElement,m=M[t];if(m){d.setAttribute('data-theme',m[0]);if(m[1])d.setAttribute('data-skin',m[1]);}else{var h=d.getAttribute('data-theme');d.setAttribute('data-theme',(h==='light'||h==='dark')?h:matchMedia('(prefers-color-scheme: light)').matches?'light':'dark');}})();</script>
 <meta name="color-scheme" content="dark light">
 <script src="config.js"></script>
 <script src="lg-store.js"></script>
@@ -704,6 +704,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="theme-radar.css">
 <link rel="stylesheet" href="theme-glass.css">
+<link rel="stylesheet" href="theme-skins.css">
 <canvas id="bgfx" aria-hidden="true"></canvas><div class="fx" aria-hidden="true"></div>
 <div class="shell" id="shell">
   <div class="work">
@@ -829,7 +830,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
         <button class="iconbtn" id="jAudit" title="Token audit" aria-label="Token audit">🧾</button>
         <button class="iconbtn" id="jStyle" title="Reply style: length and tone" aria-label="Reply style" style="font:700 13px var(--f-hud)">Aa</button>
         <button class="iconbtn" id="jDeep" title="Deep think: smarter, slower answers" aria-label="Deep think">🧠</button>
-        <button class="iconbtn" id="jHermes" title="Hermes mode: your messages go to the Hermes agent on your PC (real tools: web research, your files, your Brain)" aria-label="Hermes mode">☤</button>
+        <button class="iconbtn" id="jHermes" title="Hermes mode: your messages go to the Hermes agent on your PC (real tools: web research, your files, your Brain)" aria-label="Hermes mode">⚕</button>
         <button class="iconbtn" id="jVoice" title="Voice on (tap to mute)" aria-label="Voice on or off" hidden>🔊</button>
         <button class="iconbtn" id="jClear" title="Clear conversation" aria-label="Clear conversation">⟲</button>
         <button class="iconbtn" id="jHide" title="Hide Jarvis" aria-label="Hide Jarvis">→</button>
@@ -1016,7 +1017,7 @@ const learnedDue = () => [...C('topics').values()].filter(t => t.status === 'lea
 function activityDays(){ const s = new Set(); for (const d of C('done').values()) if (d.date) s.add(String(d.date).slice(0,10)); for (const p of C('plans').values()) for (const d of (p.days||[])) if ((d.items||[]).some(i => i.done)) s.add(d.date); for (const c of C('courses').values()) for (const x of courseVideos(c)) if (x.v.doneAt) s.add(String(x.v.doneAt).slice(0,10)); return s; }
 function streak(){ const s = activityDays(); let n = 0, d = today(); if (!s.has(d)) d = addDays(d,-1); while (s.has(d)) { n++; d = addDays(d,-1); } return n; }
 function weekMinutesDone(){ const p = planDoc(); let m = 0; for (const d of ((p && p.days) || [])) for (const i of (d.items||[])) if (i.done) m += Number(i.minutes)||0; return m; }
-function recordDone(kind, ref, title, minutes){ const id = (kind+'-'+ref).replace(/[^A-Za-z0-9_\-.~:@+]/g,'-').slice(0,180); return put('done', id, {kind, ref, title, date: today(), at: nowIso(), minutes: minutes||0, source:'me', xp: 20}); }
+function recordDone(kind, ref, title, minutes){ try { window.dispatchEvent(new CustomEvent('lg-celebrate', {detail: {text: kind === 'topic' ? `Mastered: ${title} ✨` : 'Done ✨ ' + String(title || '').slice(0, 40)}})); } catch(e){} const id = (kind+'-'+ref).replace(/[^A-Za-z0-9_\-.~:@+]/g,'-').slice(0,180); return put('done', id, {kind, ref, title, date: today(), at: nowIso(), minutes: minutes||0, source:'me', xp: 20}); }
 
 /* ============ tabs ============ */
 function setTab(t){ S.tab = t; LS.set('tab', t); $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t)); $$('.view').forEach(v => v.hidden = v.id !== 'v-'+t); window.scrollTo({top:0}); render(); }
@@ -1537,13 +1538,13 @@ function hermesSettle(){ // copy finished Hermes replies into the thread so they
   if (ch) saveThread(out);
 }
 function hermesBlock(hid){ const h = C('hermes').get(hid);
-  if (!h) return '<div class="via"><span class="live"></span>☤ HERMES · sending…</div>';
+  if (!h) return '<div class="via"><span class="live"></span>⚕ HERMES · sending…</div>';
   const live = h.status === 'pending' || h.status === 'running';
   const st = h.status === 'done' ? 'done' : h.status === 'error' ? 'problem' : h.status === 'running' ? 'working on it' : (h.waiting || !hermesOnline()) ? 'waiting for your PC' : 'queued';
-  return `<div class="via ${h.status === 'error' ? 'off' : ''}">${live ? '<span class="live"></span>' : ''}☤ HERMES · ${st}</div>${h.reply ? `<div class="md">${md(h.reply)}</div>` : live ? '<span class="typing"><i></i><i></i><i></i></span>' : ''}${h.status === 'error' ? `<div class="faint" style="font-size:12.5px">${esc(h.error || '')}</div>` : ''}`; }
+  return `<div class="via ${h.status === 'error' ? 'off' : ''}">${live ? '<span class="live"></span>' : ''}⚕ HERMES · ${st}</div>${h.reply ? `<div class="md">${md(h.reply)}</div>` : live ? '<span class="typing"><i></i><i></i><i></i></span>' : ''}${h.status === 'error' ? `<div class="faint" style="font-size:12.5px">${esc(h.error || '')}</div>` : ''}`; }
 async function hermesAsk(text, o={}){
   openJarvis(); stopSpeech();
-  if (jImg) { toast('Images go to the in-app AI: switch Hermes mode off (☤) to send a photo.'); jImg = null; }
+  if (jImg) { toast('Images go to the in-app AI: switch Hermes mode off (⚕) to send a photo.'); jImg = null; }
   const id = await hermesQueue(text, 'hermes-mode'); if (!id) return;
   await saveThread([...thread(), {role:'user', content: o.label || text, at: nowIso()}, {role:'assistant', content:'…', hid: id, via:'hermes', at: nowIso()}]); render();
 }
@@ -1560,8 +1561,8 @@ renderers.push(function jarvis_(){
   $('#jName').textContent = aiName(); $('#fabName').textContent = aiName().replace(/\./g, '');
   const msgs = thread().slice(); if (pending) msgs.push(...pending);
   const log = $('#jLog');
-  log.innerHTML = msgs.length ? msgs.map(m => `<div class="msg ${m.role}">${m.img ? '<div class="faint" style="font-size:12px">📎 image attached</div>' : ''}${m.role === 'assistant' ? (m.hid && m.content === '…' ? hermesBlock(m.hid) : `${m.via === 'hermes' ? '<div class="via">☤ HERMES</div>' : ''}<div class="md">${m.content === '…' ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div>${(m.hids || []).map(h => `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,211,107,.3)">${hermesBlock(h)}</div>`).join('')}`) : esc(m.content)}${(m.acts||[]).length ? `<div class="acts-done">${m.acts.map(a => '✓ '+esc(a)).join('<br>')}</div>` : ''}${m.role === 'assistant' && m.content !== '…' && canSpeak() ? `<button class="say" data-say="${esc(m.at||'')}" title="Read aloud" aria-label="Read aloud">🔊</button>` : ''}</div>`).join('')
-    : `<div class="msg assistant"><div class="md"><p><b>${esc(aiName())} online.</b> ${esc(persona().hello)}</p><p>I can run this whole app for you: plan your days, build YouTube courses and schedule them, add or move topics, make flashcards, quiz you, start focus or review, track tasks, queue web research, and remember what matters to you. Ask me for a new app feature and Claude will build and ship it. Big jobs (deep research into your Brain, files, code) I hand to <b>Hermes</b> on your PC; tap ☤ to talk to Hermes directly. Tap the name above to switch persona. 📎 lets me read a photo of your notes.</p></div></div>`;
+  log.innerHTML = msgs.length ? msgs.map(m => `<div class="msg ${m.role}">${m.img ? '<div class="faint" style="font-size:12px">📎 image attached</div>' : ''}${m.role === 'assistant' ? (m.hid && m.content === '…' ? hermesBlock(m.hid) : `${m.via === 'hermes' ? '<div class="via">⚕ HERMES</div>' : ''}<div class="md">${m.content === '…' ? '<span class="typing"><i></i><i></i><i></i></span>' : md(m.content)}</div>${(m.hids || []).map(h => `<div style="margin-top:8px;padding-top:8px;border-top:1px dashed rgba(255,211,107,.3)">${hermesBlock(h)}</div>`).join('')}`) : esc(m.content)}${(m.acts||[]).length ? `<div class="acts-done">${m.acts.map(a => '✓ '+esc(a)).join('<br>')}</div>` : ''}${m.role === 'assistant' && m.content !== '…' && canSpeak() ? `<button class="say" data-say="${esc(m.at||'')}" title="Read aloud" aria-label="Read aloud">🔊</button>` : ''}</div>`).join('')
+    : `<div class="msg assistant"><div class="md"><p><b>${esc(aiName())} online.</b> ${esc(persona().hello)}</p><p>I can run this whole app for you: plan your days, build YouTube courses and schedule them, add or move topics, make flashcards, quiz you, start focus or review, track tasks, queue web research, and remember what matters to you. Ask me for a new app feature and Claude will build and ship it. Big jobs (deep research into your Brain, files, code) I hand to <b>Hermes</b> on your PC; tap ⚕ to talk to Hermes directly. Tap the name above to switch persona. 📎 lets me read a photo of your notes.</p></div></div>`;
   log.scrollTop = log.scrollHeight;
   $$('#jLog [data-say]').forEach(b => b.onclick = () => { const m = thread().find(x => x.at === b.dataset.say); if (m) say(m.content, true); });
   const last = thread().slice(-1)[0];
@@ -1569,7 +1570,7 @@ renderers.push(function jarvis_(){
   $('#jChips').innerHTML = chips.map(c => `<button class="chip">${esc(c)}</button>`).join('');
   $$('#jChips .chip').forEach(b => b.onclick = () => { const t = b.textContent; if (t.endsWith('…')) { $('#jInput').value = t.replace(/…$/, ' '); $('#jInput').focus(); } else if (t === 'Plan my week') planWeek(); else if (t === 'Brief me') briefMe(); else if (t === '⚔ Training sim') openBattlePicker(); else if (t === '🧪 Neural Lab') openLab(); else jarvisAsk(t === 'Quiz me' ? 'Quiz me on something I have learned or am learning. One question at a time.' : t); });
   $('#orb').classList.toggle('busy', S.jBusy); $('#jSend').textContent = S.jBusy ? 'Stop' : 'Send';
-  $('#jSub').textContent = S.jBusy ? (S.deep ? 'Thinking deeply…' : 'Thinking…') : VOICE.speaking ? 'Speaking…' : micOn ? 'Listening…' : S.hermes ? (hermesOnline() ? '☤ Hermes mode · online on your PC' : hermesFresh() ? '☤ Hermes mode · bridge up, Hermes offline' : '☤ Hermes mode · PC offline, will queue') : S.sample ? 'Online · tap name to switch' : 'Needs an AI key (⚡ App)';
+  $('#jSub').textContent = S.jBusy ? (S.deep ? 'Thinking deeply…' : 'Thinking…') : VOICE.speaking ? 'Speaking…' : micOn ? 'Listening…' : S.hermes ? (hermesOnline() ? '⚕ Hermes mode · online on your PC' : hermesFresh() ? '⚕ Hermes mode · bridge up, Hermes offline' : '⚕ Hermes mode · PC offline, will queue') : S.sample ? 'Online · tap name to switch' : 'Needs an AI key (⚡ App)';
   $('#jHermes').classList.toggle('on', !!S.hermes);
   if (!hPollT && [...C('hermes').values()].some(h => h.status === 'pending' || h.status === 'running')) hermesPoll();
   if (thread().some(m => m.hid && m.content === '…')) setTimeout(hermesSettle, 0);
@@ -1623,7 +1624,7 @@ document.addEventListener('click', e => { if (!e.target.closest('#jPersonas,#jNa
 $('#jAudit').onclick = () => openAudit();
 $('#jStyle').onclick = () => openStyle();
 $('#jDeep').onclick = () => { S.deep = !S.deep; LS.set('deep', S.deep); toast(S.deep ? 'Deep think on: smarter, slower answers.' : 'Deep think off: fast answers.'); render(); };
-$('#jHermes').onclick = () => { S.hermes = !S.hermes; LS.set('hermesMode', S.hermes); toast(S.hermes ? (hermesOnline() ? '☤ Hermes mode on: messages go to Hermes on your PC (full tools).' : '☤ Hermes mode on. Your PC looks offline: messages queue until it is on.') : 'Hermes mode off: fast in-app AI. (Jarvis can still hand big jobs to Hermes.)', 4500); render(); };
+$('#jHermes').onclick = () => { S.hermes = !S.hermes; LS.set('hermesMode', S.hermes); toast(S.hermes ? (hermesOnline() ? '⚕ Hermes mode on: messages go to Hermes on your PC (full tools).' : '⚕ Hermes mode on. Your PC looks offline: messages queue until it is on.') : 'Hermes mode off: fast in-app AI. (Jarvis can still hand big jobs to Hermes.)', 4500); render(); };
 $('#jAttach').onclick = () => $('#jFile').click();
 $('#jFile').onchange = e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return; if (f.size > 8e6) { toast('That image is too large (max 8 MB).'); return; } jImg = f; render(); $('#jInput').focus(); };
 $('#jImgX').onclick = () => { jImg = null; render(); };
