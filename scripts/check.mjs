@@ -62,5 +62,28 @@ if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < htm
   if (!okH) fail('Hermes bridge: COLS hermes, #jHermes, hermesQueue and the hermes/move_topic actions must be wired'); else ok('Jarvis → Hermes bridge and Brain actions are wired'); }
 { const fe = validateFeed(JSON.parse(readFileSync('app/feed/latest.json', 'utf8'))); if (fe.length) fail('feed: ' + fe.join('; ')); else ok('daily feed is valid'); }
 
+// Curated AI-learning videos/playlists must be visible in Library and use real YouTube IDs/links.
+{ const picks = JSON.parse(readFileSync('app/ai-video-picks.json', 'utf8'));
+  const idsOk = Array.isArray(picks.videos) && picks.videos.length >= 8 && picks.videos.every(v => /^[A-Za-z0-9_-]{11}$/.test(v.id) && v.url === `https://www.youtube.com/watch?v=${v.id}`);
+  const listsOk = Array.isArray(picks.playlists) && picks.playlists.length >= 6 && picks.playlists.every(p => /^https:\/\/www\.youtube\.com\/playlist\?list=[A-Za-z0-9_-]+$/.test(p.url));
+  const uiOk = html.includes('data-sub="videos"') && html.includes("s === 'videos'") && html.includes('ai-video-picks.json') && html.includes('img.youtube.com/vi/');
+  if (!idsOk || !listsOk || !uiOk) fail('AI video recommendations: curated video/playlist data and the Library > Videos renderer are required'); else ok(`AI video recommendations: ${picks.videos.length} videos and ${picks.playlists.length} playlists are wired`); }
+
+// Krishna needs sprite-sheet walking, a clearly reversible hide control, and editable daily reminders.
+{ const pets = readFileSync('app/lg-pets.js', 'utf8');
+  const petOk = pets.includes('running-right') && pets.includes('running-left') && pets.includes('petWalkEnabled') && pets.includes('Bring Krishna back');
+  const remOk = html.includes('checkDailyReminders') && html.includes('Naam Jaap') && html.includes('Reminder time');
+  if (!petOk || !remOk) fail('Krishna walking/recall and configurable Naam Jaap daily reminders are required'); else ok('Krishna walking/recall and daily reminders are wired'); }
+
+// Manual resource buckets and Instagram capture/research remain separate synced workflows.
+{ const cols = html.match(/const COLS = \[([^\]]+)\]/)?.[1] || '';
+  const separate = cols.includes("'buckets'") && cols.includes("'instagram'") && html.includes("s === 'buckets'") && html.includes("s === 'instagram'") && html.includes("s === 'ig-research'");
+  const ig = html.includes('data-ig-research') && html.includes("source:'instagram'") && html.includes('instagramResearchNote') && html.includes('caption or transcript');
+  const bucket = html.includes('data-bucket-add') && html.includes('data-bucket-kind') && html.includes('data-bucket-resources');
+  const daily = readFileSync('jobs/daily.md', 'utf8');
+  const job = daily.includes('For `source: "instagram"`') && daily.includes('aiKindReason') && daily.includes('Leave the user\'s `kind` untouched');
+  if (!separate || !ig || !bucket || !job) fail('Manual buckets and Instagram links/research need separate collections, classifications, resource links, and research context');
+  else ok('Manual resource buckets and Instagram capture/research are separate and wired'); }
+
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }
 console.log('\nall checks passed');
