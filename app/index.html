@@ -799,12 +799,12 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
           <div class="card ask">
             <div class="label">New course</div>
             <h2>What do you want to learn?</h2>
-            <p class="muted" style="font-size:14px">Describe it in your own words. Jarvis drafts an ordered syllabus right away, and the course builder then finds the real YouTube videos and writes notes for each one.</p>
+            <p class="muted" style="font-size:14px">Build with AI to get an ordered syllabus and video suggestions, or create a blank course and add everything yourself—no AI required.</p>
             <textarea class="inp" id="askText" rows="2" placeholder="e.g. Learn RAG properly so I can build one for my notes. I know Python, not embeddings."></textarea>
             <div class="opts">
               <label><span class="label">Level</span><select class="inp" id="askLevel"><option value="beginner">Beginner</option><option value="intermediate" selected>Intermediate</option><option value="advanced">Advanced</option></select></label>
               <label><span class="label">Time per day</span><select class="inp" id="askMin"><option value="20">20 min</option><option value="30">30 min</option><option value="45" selected>45 min</option><option value="60">1 hour</option><option value="90">1.5 hours</option></select></label>
-              <button class="btn primary go" id="askBtn">Build my course</button>
+              <div class="row" style="grid-column:1/-1;flex-wrap:wrap"><button class="btn primary" id="askBtn">Build with AI</button><button class="btn" id="manualCourseBtn" type="button">Create course manually</button></div>
             </div>
           </div>
           <div class="sec-h" style="margin-top:22px"><h3>Your courses</h3></div>
@@ -959,20 +959,41 @@ const safeUrl = u => /^https?:\/\//i.test(String(u||'').trim()) ? String(u).trim
 const ytSearch = q => 'https://www.youtube.com/results?search_query='+encodeURIComponent(q);
 const ytId = (u, explicit='') => { const x = String(explicit || u || ''); const m = x.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/) || ( /^[A-Za-z0-9_-]{11}$/.test(x) ? [x,x] : null ); return m ? m[1] : ''; };
 const ytThumb = (url, explicit, alt='') => { const id = ytId(url, explicit); return id ? `<a class="yt-thumb" href="${esc(safeUrl(url))}" target="_blank" rel="noopener" aria-label="Watch ${esc(alt)} on YouTube"><img loading="lazy" src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="YouTube thumbnail: ${esc(alt)}" onerror="this.closest('.yt-thumb').hidden=true"><span>▶</span></a>` : ''; };
+function resourceIdentity(url, videoId=''){
+  const raw=safeUrl(url); if(!raw)return {id:ytId(videoId),url:''};
+  const id=ytId(raw)||ytId(videoId);
+  let normalized=raw;
+  try{const x=new URL(raw);x.hash='';for(const k of [...x.searchParams.keys()])if(/^utm_/i.test(k)||/^(fbclid|gclid)$/i.test(k))x.searchParams.delete(k);normalized=x.href.replace(/\/$/,'');}catch(e){normalized=raw.replace(/\/$/,'');}
+  return {id,url:normalized};
+}
+function sameResource(url, videoId, otherUrl, otherVideoId=''){
+  const a=resourceIdentity(url,videoId), b=resourceIdentity(otherUrl,otherVideoId);
+  return !!((a.id&&a.id===b.id)||(a.url&&b.url&&a.url===b.url));
+}
 function resourceCourseLocations(url, videoId=''){
-  const raw=safeUrl(url); if(!raw)return [];
-  const targetId=ytId(raw)||ytId(videoId);
-  const normalize=u=>{const v=safeUrl(u);if(!v)return '';try{const x=new URL(v);x.hash='';for(const k of [...x.searchParams.keys()])if(/^utm_/i.test(k)||/^(fbclid|gclid)$/i.test(k))x.searchParams.delete(k);return x.href.replace(/\/$/,'');}catch(e){return v.replace(/\/$/,'');}};
-  const targetUrl=normalize(raw);
-  const matches=v=>{const vu=safeUrl(v.url||v.link||'');const vid=ytId(vu)||(/^[A-Za-z0-9_-]{11}$/.test(String(v.id||''))?String(v.id):'');if(targetId&&vid===targetId)return true;return !!targetUrl&&!!vu&&normalize(vu)===targetUrl;};
+  if(!safeUrl(url))return [];
   const found=[];
-  for(const c of C('courses').values())for(const [mi,m] of (c.modules||[]).entries())if((m.videos||[]).some(matches))found.push({course:c.title||c.ask||'Untitled course',module:m.t||'Module '+(mi+1)});
+  for(const c of C('courses').values())for(const [mi,m] of (c.modules||[]).entries())if((m.videos||[]).some(v=>sameResource(url,videoId,v.url||v.link||'',v.id)))found.push({course:c.title||c.ask||'Untitled course',module:m.t||'Module '+(mi+1)});
+  return found;
+}
+function resourcePathLocations(url, videoId=''){
+  if(!safeUrl(url))return [];
+  const found=[];
+  for(const [collection,type] of [['paths','Path'],['tracks','Track']])for(const p of C(collection).values())for(const [i,step] of (p.steps||[]).entries()){
+    const match=sameResource(url,videoId,step.url||'',step.videoId)||(step.links||[]).some(link=>sameResource(url,videoId,link.url||'',link.videoId));
+    if(match)found.push({type,path:p.title||'Untitled '+type.toLowerCase(),step:step.t||'Step '+(i+1)});
+  }
   return found;
 }
 function newsCourseFlag(places){
   if(!places.length)return '<span class="pill" title="Not present in any course">○ Not in course</span>';
   const all=places.map(p=>p.course+' → '+p.module), label=all[0]+(all.length>1?' +'+(all.length-1):'');
   return `<span class="pill" title="Present in: ${esc(all.join('; '))}" aria-label="Present in: ${esc(all.join('; '))}">✓ In: ${esc(label)}</span>`;
+}
+function pathPresenceFlag(places){
+  if(!places.length)return '<span class="pill" title="Not present in any path or track">○ Not in path</span>';
+  const all=places.map(p=>`${p.type}: ${p.path} → ${p.step}`), label=all[0]+(all.length>1?' +'+(all.length-1):'');
+  return `<span class="pill" title="Present in: ${esc(all.join('; '))}" aria-label="Present in: ${esc(all.join('; '))}">✓ ${esc(label)}</span>`;
 }
 function saveResourceButton(title, url, kind='resource', videoId='', summary=''){
   const u=safeUrl(url); if(!u&&!['path','path-step'].includes(kind))return '';
@@ -1215,6 +1236,17 @@ function botReady(kind){ const m = C('meta').get('refresh')||{}; return !!(S.mcp
 async function fireBot(kind){ const m = C('meta').get('refresh') || {}; const id = kind === 'course' ? m.courseTriggerId : m.triggerId; if (!S.mcp || !id) return false;
   try { await S.mcp.callTool('Claude Code Remote', 'fire_trigger', {trigger_id: id}); return true; } catch(e){ console.warn(e); return false; } }
 $('#askBtn').onclick = () => createCourse($('#askText').value.trim(), $('#askLevel').value, Number($('#askMin').value));
+$('#manualCourseBtn').onclick = () => { const title=prompt('Course name:',''); if(title===null||!title.trim())return; createManualCourse(title.trim()); };
+async function createManualCourse(title){
+  const name=String(title||'').trim().slice(0,120);
+  if(!name){toast('Enter a course name first.');return null;}
+  if(!S.db){toast('Your data store is not connected.');return null;}
+  const id=slug(name)+'-'+rid();
+  const course={title:name,ask:name,level:'self-paced',minutesPerDay:45,summary:'',status:'ready',modules:[],created:nowIso(),touched:nowIso(),source:'manual'};
+  C('courses').set(id,Object.assign({id},course));
+  await put('courses',id,course);
+  S.course=id;setTab('courses');toast('Manual course created. Add modules and lessons whenever you’re ready.');return id;
+}
 async function createCourse(ask, level='intermediate', perDay=45){
   if (!ask) { toast('Write what you want to learn first.'); return null; }
   if (!S.db) { toast('Your data store is not connected.'); return null; }
@@ -1456,7 +1488,7 @@ renderers.push(function library_(){
   }
   else if (s === 'news') {
     const ns = [...C('news').values()];
-    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => { const coursePlaces=resourceCourseLocations(x.url,x.videoId); return `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a> ${newsCourseFlag(coursePlaces)}</div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div></div><span class="pill">${esc(x.kind||'')}</span>${saveResourceButton(x.title||x.url,x.url,x.kind==='video'?'video':'resource',x.videoId)}</li>`; }).join('')}</ul>` : '<div class="empty">No news yet.</div>';
+    el.innerHTML = ns.length ? `<ul class="items card">${ns.map(x => { const coursePlaces=resourceCourseLocations(x.url,x.videoId), pathPlaces=resourcePathLocations(x.url,x.videoId); return `<li><div class="body"><div class="t"><a href="${esc(safeUrl(x.url))}" target="_blank" rel="noopener">${esc(x.title)}</a> ${newsCourseFlag(coursePlaces)} ${pathPresenceFlag(pathPlaces)}</div><div class="faint" style="font-size:13px">${esc(x.summary||'')}</div><div class="mono faint" style="font-size:11.5px;margin-top:2px">${esc(x.source||'')} · ${esc(x.date||'')}</div></div><span class="pill">${esc(x.kind||'')}</span>${saveResourceButton(x.title||x.url,x.url,x.kind==='video'?'video':'resource',x.videoId)}</li>`; }).join('')}</ul>` : '<div class="empty">No news yet.</div>';
   }
   else if (s === 'tasks') {
     const ts = [...C('tasks').values()].sort((a,b) => (a.done?1:0)-(b.done?1:0) || String(a.due||'9').localeCompare(String(b.due||'9')));
