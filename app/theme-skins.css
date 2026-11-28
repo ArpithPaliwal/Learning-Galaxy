@@ -1,43 +1,45 @@
 /* Learning Galaxy — theme skins. Loaded last.
  * html[data-theme] stays "dark" or "light" (all existing CSS keys off it); html[data-skin] repaints the palette.
- *   black      Midnight black — true #000 (AMOLED), silver-white accent, minimal glow
- *   gold       Black & gold   — black lacquer with warm gold accents
+ *   black      Black glass    — pure #000 with clear frosted-glass panels
+ *   stark      Iron Man       — hot-rod red, gold and arc-reactor cyan
  *   peacock    Peacock night  — deep teal-blue with peacock green + gold (Krishna's feather)
  *   vrindavan  Vrindavan dawn — warm cream, lotus pink, peacock blue and saffron (light) */
 
 html.theme-anim body,html.theme-anim .card,html.theme-anim .top,html.theme-anim .jarvis,html.theme-anim .btn{transition:background-color .5s,background .5s,color .4s,border-color .4s,box-shadow .5s}
 
-/* ---------------- Midnight black ---------------- */
+/* ---------------- Black glass ---------------- */
 html[data-skin="black"]{
-  --bg:#000; --bg-2:#050505; --panel:#0b0b0c; --panel-2:#121214; --line:#1c1c1f; --line-2:#2a2a2e;
-  --fg:#F4F4F5; --fg-2:#A1A1AA; --fg-3:#6B6B74;
-  --accent:#F4F4F5; --accent-2:#FFFFFF; --accent-ink:#000; --deep:#D4D4D8; --ion:#E4E4E7;
-  --glow:rgb(255 255 255 / .18); --glow-soft:rgb(255 255 255 / .06);
-  --st-learned:#FFFFFF; --st-learning:#D4D4D8; --st-todo:#52525B; --st-sugg:#27272A;
-  --c-acc:244 244 245; --c-ion:228 228 231; --c-deep:212 212 216; --c-s0:0 0 0; --c-s1:11 11 12;
-  --g-fill:rgb(14 14 16 / .72); --g-fill-2:rgb(18 18 20 / .86); --g-line:rgb(255 255 255 / .08); --g-hi:rgb(255 255 255 / .05);
-  --g-shadow:0 18px 50px -24px rgb(0 0 0 / .9), 0 1px 0 0 rgb(255 255 255 / .04) inset;
+  --bg:#000; --bg-2:#000; --panel:#0a0a0b; --panel-2:#111113; --line:#1f1f23; --line-2:#2e2e34;
+  --fg:#F7F7F8; --fg-2:#A8A8B3; --fg-3:#6E6E78;
+  --accent:#FFFFFF; --accent-2:#C9CEFF; --accent-ink:#000; --deep:#D4D4D8; --ion:#C9CEFF;
+  --glow:rgb(200 210 255 / .22); --glow-soft:rgb(255 255 255 / .06);
+  --st-learned:#FFFFFF; --st-learning:#C9CEFF; --st-todo:#55555F; --st-sugg:#26262B;
+  --c-acc:255 255 255; --c-ion:201 206 255; --c-deep:212 212 216; --c-s0:0 0 0; --c-s1:10 10 11;
+  --g-fill:rgb(255 255 255 / .045); --g-fill-2:rgb(20 20 24 / .62); --g-line:rgb(255 255 255 / .13); --g-hi:rgb(255 255 255 / .09);
+  --g-blur:26px; --g-shadow:0 24px 60px -28px rgb(0 0 0 / .95), 0 1px 0 0 rgb(255 255 255 / .14) inset, 0 0 0 1px rgb(255 255 255 / .02) inset;
 }
 html[data-skin="black"] body{background:#000 fixed!important}
-html[data-skin="black"] #bgfx,html[data-skin="black"] .fx{opacity:.35}
-html[data-skin="black"] .now{background:linear-gradient(160deg,#151517,#050505)!important}
+html[data-skin="black"] .now{background:linear-gradient(160deg,rgb(255 255 255 / .08),rgb(255 255 255 / .02))!important;-webkit-backdrop-filter:blur(26px);backdrop-filter:blur(26px)}
+html[data-skin="black"] .btn.primary,html[data-skin="black"] .bz-views button.on{background:#fff;color:#000}
+html[data-skin="black"] .jarvis{background:linear-gradient(180deg,rgb(255 255 255 / .05),rgb(0 0 0 / .7) 45%)!important}
 
-/* ---------------- Black & gold ---------------- */
-html[data-skin="gold"]{
-  --bg:#050403; --bg-2:#0b0906; --panel:#100d08; --panel-2:#17130b; --line:#2a2214; --line-2:#4a3a1c;
-  --fg:#FBF3E0; --fg-2:#D7C49A; --fg-3:#8F7B55;
-  --accent:#E8B54A; --accent-2:#F6D27A; --accent-ink:#1a1204; --deep:#B8862B; --ion:#F0C35E;
-  --glow:rgb(232 181 74 / .40); --glow-soft:rgb(232 181 74 / .10);
-  --st-learned:#F6D27A; --st-learning:#E8B54A; --st-todo:#7A5F2C; --st-sugg:#3A2E17;
-  --c-acc:232 181 74; --c-ion:240 195 94; --c-deep:184 134 43; --c-s0:5 4 3; --c-s1:16 13 8;
-  --g-fill:rgb(22 17 9 / .62); --g-fill-2:rgb(26 20 10 / .82); --g-line:rgb(232 181 74 / .16); --g-hi:rgb(255 230 170 / .07);
-  --g-shadow:0 18px 50px -24px rgb(0 0 0 / .85), 0 1px 0 0 rgb(255 220 150 / .07) inset;
+/* ---------------- Iron Man ---------------- */
+html[data-skin="stark"]{
+  --bg:#070102; --bg-2:#0e0304; --panel:#140506; --panel-2:#1c0709; --line:#3a0e12; --line-2:#5c161c;
+  --fg:#FFF1EE; --fg-2:#E8B9B2; --fg-3:#A0706A;
+  --accent:#E0242F; --accent-2:#F5C542; --accent-ink:#FFFFFF; --deep:#B11226; --ion:#7DF9FF;
+  --glow:rgb(224 36 47 / .45); --glow-soft:rgb(224 36 47 / .12);
+  --good:#7DF9FF; --warn:#F5C542; --crit:#FF4D57;
+  --st-learned:#F5C542; --st-learning:#E0242F; --st-todo:#6A1E23; --st-sugg:#33100F;
+  --c-acc:224 36 47; --c-ion:125 249 255; --c-deep:177 18 38; --c-s0:7 1 2; --c-s1:20 5 6;
+  --g-fill:rgb(40 8 10 / .45); --g-fill-2:rgb(30 6 8 / .72); --g-line:rgb(245 197 66 / .16); --g-hi:rgb(255 210 120 / .07);
+  --g-shadow:0 18px 50px -24px rgb(0 0 0 / .9), 0 1px 0 0 rgb(245 197 66 / .12) inset;
 }
-html[data-skin="gold"] body{background:
-  radial-gradient(900px 600px at 15% 0%,rgb(232 181 74 / .10),transparent 60%),
-  radial-gradient(800px 600px at 90% 100%,rgb(184 134 43 / .10),transparent 60%),#050403 fixed!important}
-html[data-skin="gold"] .now{background:linear-gradient(160deg,#2a1f0c,#0b0805)!important;border-color:rgb(232 181 74 / .3)!important}
-html[data-skin="gold"] h1,html[data-skin="gold"] .bz-views button.on{letter-spacing:.01em}
+html[data-skin="stark"] body{background:#070102 fixed!important}
+html[data-skin="stark"] .now{background:linear-gradient(150deg,#7a0d16,#2a0507 60%)!important;border-color:rgb(245 197 66 / .35)!important}
+html[data-skin="stark"] .jarvis{background:linear-gradient(180deg,rgb(125 249 255 / .06),rgb(10 2 3 / .82) 45%)!important}
+html[data-skin="stark"] h1,html[data-skin="stark"] h2,html[data-skin="stark"] .bz-views button{letter-spacing:.04em}
+html[data-skin="stark"] .btn.primary{background:linear-gradient(135deg,#B11226,#E0242F);box-shadow:0 0 18px -4px rgb(224 36 47 / .7)}
 
 /* ---------------- Peacock night ---------------- */
 html[data-skin="peacock"]{
@@ -49,10 +51,7 @@ html[data-skin="peacock"]{
   --c-acc:47 211 192; --c-ion:233 196 106; --c-deep:26 143 168; --c-s0:2 16 15; --c-s1:6 34 36;
   --g-fill:rgb(8 44 48 / .45); --g-fill-2:rgb(10 52 56 / .62); --g-line:rgb(127 240 225 / .14); --g-hi:rgb(255 255 255 / .07);
 }
-html[data-skin="peacock"] body{background:
-  radial-gradient(900px 600px at 10% 10%,rgb(26 143 168 / .25),transparent 60%),
-  radial-gradient(700px 500px at 90% 20%,rgb(47 211 192 / .14),transparent 60%),
-  radial-gradient(800px 700px at 60% 100%,rgb(70 40 140 / .22),transparent 60%),#010b0b fixed!important}
+html[data-skin="peacock"] body{background:#02100f fixed!important}
 html[data-skin="peacock"] .now{background:linear-gradient(160deg,#0d4d55,#04191a)!important}
 
 /* ---------------- Vrindavan dawn (light) ---------------- */
@@ -67,10 +66,7 @@ html[data-skin="vrindavan"]{
   --g-fill:rgb(255 251 240 / .62); --g-fill-2:rgb(255 250 238 / .80); --g-line:rgb(255 255 255 / .9); --g-hi:rgb(255 255 255 / .95);
   --g-shadow:0 16px 40px -22px rgb(150 80 30 / .28), 0 1px 0 0 rgb(255 255 255 / .95) inset;
 }
-html[data-skin="vrindavan"] body{background:
-  radial-gradient(520px 520px at 82% 12%,rgb(255 214 120 / .55),transparent 62%),
-  radial-gradient(800px 500px at 8% 0%,rgb(255 190 200 / .35),transparent 60%),
-  radial-gradient(900px 500px at 50% 112%,rgb(150 190 90 / .35),transparent 60%),#FFF3DC fixed!important}
+html[data-skin="vrindavan"] body{background:#FFF3DC fixed!important}
 html[data-skin="vrindavan"] .now{background:linear-gradient(150deg,#1F5FA8,#2A8FD0 55%,#7FC6E8)!important;color:#fff}
 html[data-skin="vrindavan"] .now *{color:inherit}
 html[data-skin="vrindavan"] .bl{color:#5a2e1c;text-shadow:0 0 6px #fff8ea,0 0 2px #fff8ea!important}
@@ -89,6 +85,10 @@ html[data-skin="vrindavan"] .bz-stage{background:radial-gradient(ellipse at 50% 
 
 /* Jarvis panel per skin (theme-glass paints it night-blue for all dark themes) */
 html[data-skin="black"] .jarvis{background:linear-gradient(180deg,#0c0c0d,#000 45%)!important}
-html[data-skin="gold"] .jarvis{background:linear-gradient(180deg,rgb(70 50 16 / .40),rgb(8 6 3 / .88) 45%)!important}
 html[data-skin="peacock"] .jarvis{background:linear-gradient(180deg,rgb(20 100 100 / .35),rgb(2 16 15 / .82) 45%)!important}
 html[data-skin="vrindavan"] .jarvis{background:rgb(255 248 232 / .72)!important}
+
+/* glass transparency slider (theme popover) */
+.lg-glass{border-top:1px solid var(--g-line,var(--line));margin-top:6px;padding:8px 8px 2px}
+.lg-glass input{width:100%;accent-color:var(--accent)}
+.lg-glass-k{display:flex;justify-content:space-between;font-size:11px;color:var(--fg-3)}

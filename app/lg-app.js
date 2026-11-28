@@ -58,8 +58,8 @@
   const THEMES = {
     system: ['◐', 'Follow device', null, '', ['#01060f', '#F3F6FC']],
     dark: ['☾', 'Deep space', 'dark', '', ['#01060f', '#5EC8FF']],
-    black: ['●', 'Midnight black', 'dark', 'black', ['#000000', '#f2f2f2']],
-    gold: ['✦', 'Black & gold', 'dark', 'gold', ['#050403', '#E8B54A']],
+    black: ['●', 'Black glass', 'dark', 'black', ['#000000', '#9aa6ff']],
+    stark: ['⬢', 'Iron Man', 'dark', 'stark', ['#B11226', '#F5C542']],
     peacock: ['🦚', 'Peacock night', 'dark', 'peacock', ['#03141a', '#2FD3C0']],
     vrindavan: ['🪷', 'Vrindavan dawn', 'light', 'vrindavan', ['#FFF6E5', '#E0457B']],
     light: ['☀', 'Frost', 'light', '', ['#F3F6FC', '#2350E6']],
@@ -71,13 +71,18 @@
     applyTheme();
     paintTheme(); toast('Theme: ' + THEMES[t][1]); if (panelTab === 'home') draw(); window.dispatchEvent(new Event('lg-theme'));
   }
+  function applyGlass() { const v = Number(LG.cfg.get('glass', 50)); const h = document.documentElement.style; h.setProperty('--g-solid', Math.max(0, (v - 50) * 2) + '%'); h.setProperty('--g-keep', Math.min(100, 30 + v * 1.4) + '%'); }
+  applyGlass();
   function applyTheme() { const t = curTheme(); const d = THEMES[t]; const h = document.documentElement; h.classList.add('theme-anim'); h.setAttribute('data-theme', d[2] || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')); if (d[3]) h.setAttribute('data-skin', d[3]); else h.removeAttribute('data-skin'); clearTimeout(applyTheme._t); applyTheme._t = setTimeout(() => h.classList.remove('theme-anim'), 700); }
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (curTheme() === 'system') applyTheme(); });
   function themePop(anchor) {
     let p = document.getElementById('lgThemePop'); if (p) { p.remove(); return; }
     p = document.createElement('div'); p.id = 'lgThemePop'; p.className = 'lg-themepop';
     p.innerHTML = '<div class="label">Theme</div>' + Object.entries(THEMES).map(([k, d]) => `<button data-th="${k}" class="${k === curTheme() ? 'on' : ''}"><i style="background:linear-gradient(135deg,${d[4][0]} 0 50%,${d[4][1]} 50% 100%)"></i><span>${d[0]} ${d[1]}</span></button>`).join('');
+    const gv = LG.cfg.get('glass', 50);
+    p.insertAdjacentHTML('beforeend', `<div class="lg-glass"><div class="label">Glass</div><input type="range" min="0" max="100" step="5" value="${gv}" aria-label="Glass transparency"><div class="lg-glass-k"><span>clear</span><span>frosted</span><span>solid</span></div></div>`);
     document.body.appendChild(p);
+    p.querySelector('.lg-glass input').oninput = (e) => { LG.cfg.set('glass', +e.target.value); applyGlass(); };
     const r = anchor.getBoundingClientRect(); const W = 230;
     p.style.left = Math.max(8, Math.min(innerWidth - W - 8, r.left + r.width / 2 - W / 2)) + 'px';
     if (r.top > innerHeight / 2) p.style.bottom = (innerHeight - r.top + 8) + 'px'; else p.style.top = (r.bottom + 8) + 'px';
