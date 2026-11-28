@@ -35,6 +35,15 @@ No dependencies, no bundler. Don't add any without a strong reason.
   - `mcp.callTool('…','fire_trigger')` → GitHub Actions `cloud-job.yml` dispatch.
   - `dictation`/`tts` are null on purpose: the app falls back to the browser's SpeechRecognition / speechSynthesis.
   - `window.LG` — helpers for the App panel and Jarvis (`LG.requestFeature`, `LG.Sync`, `LG.GH`, `LG.cfg`).
+- `app/lg-brain.js` — the **Brain** tab (data-tab `galaxy`): 3D knowledge graph (`vendor/3d-force-graph.min.js`; tracks on a
+  ring = breadth, height = topic `level` 0-5 = depth), the **horizontal/vertical Kanban** (lanes Inbox/Backlog/Horizontal/
+  Vertical/Review/Mastered derived from topic `status` + `mode` 'h'|'v' + `srs.due`; WIP limits; T-shape chart; "Plan my
+  next moves"), the one topic editor drawer used everywhere (`openTopic` → `LGBrain.open`), in-browser research
+  (Wikipedia, arXiv via `/api/research-proxy`, Semantic Scholar, GitHub, HN, HF + `S.sample` synthesis) and the
+  AI curriculum seed `app/brain-seed.json` (written once per account, `meta/brainSeed`). It reaches the app only via
+  `window.LGCore` (set at the end of index.html's inline script). Topic fields it adds: `level`, `prereqs[]`, `mode`,
+  `kind`, `confidence`, `researched`. The seed is generated from `~/ai-brain` with `py brain.py export-lg`.
+- `app/theme-glass.css` — glass layer (loaded last): frosted panels, nebula backdrop, Brain/Kanban/drawer styles.
 - `app/lg-app.js` — the ⚡ App panel (AI key, sync sign-in, Builder, backup import/export), service-worker registration, update banner.
 - `app/sw.js` — stale-while-revalidate app shell; the build stamps `CACHE` so each deploy purges the old cache.
 - `scripts/db.mjs` — CLI to the cloud data (service key) used by the cloud job.

@@ -93,3 +93,10 @@ User: "radar is good, galaxy isn't; make the whole app the radar theme; make Jar
 - Runtime: `lg-runtime.js` keeps the platform `window.claude` when present (`LG.ARTIFACT`), mirrors the artifact db via `artifactStore()`; Jarvis = viewer's Claude account (no key); Supabase sync is OFF there because claude.ai blocks network calls to other hosts (fetch/XHR/WebSocket). Feature requests become a GitHub "new issue" link.
 - Data bridge between editions = backup file: ⚡ App → Data → Download / Import (both editions). A live artifact⇄Supabase sync is impossible; an on-request bridge by Claude (ArtifactData ↔ Supabase REST) is possible.
 - Republishing: edit app/, `npm run build:artifact`, copy dist-artifact/* into the scratchpad, publish `page.html` to the same file path/URL with `files` for the feed.
+
+## Brain + glass redesign (2026-11-28)
+- Backup before this change: folder `C:\Users\arpit\learning-galaxy-backup-2026-11-28` + git tag `backup-before-brain-merge-2026-11-28`.
+- Skill Map tab is now **Brain**: 3D graph / Kanban (horizontal × vertical) / Overview (old map). See CLAUDE.md → lg-brain.js.
+- User chose: keep Supabase as the live DB (web + phone); **mirror to an Obsidian vault nightly** (scripts/mirror-obsidian.mjs, see docs/OBSIDIAN.md); start fresh with the AI Brain curriculum (106 topics, 11 tracks).
+- Deep research from the Brain queues `research` docs with a `topic` field; jobs/daily.md step 2 now also patches that topic.
+- Not done: Jarvis actions for H/V lanes; live test of arXiv relay on Netlify.

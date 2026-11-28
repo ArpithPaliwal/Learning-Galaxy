@@ -14,6 +14,6 @@ if (!sw.includes('__VERSION__')) throw new Error('sw.js lost its __VERSION__ pla
 writeFileSync('dist/sw.js', sw.replace('__VERSION__', v));
 const cfg = readFileSync('dist/config.js', 'utf8');
 writeFileSync('dist/config.js', cfg.replace(/window\.LG_VERSION = '[^']*';/, `window.LG_VERSION = '${v}';`));
-for (const f of ['index.html', 'theme.css', 'theme-radar.css', 'lg-runtime.js', 'lg-app.js', 'lg-visuals.js', 'lg-store.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'])
+for (const f of ['index.html', 'theme.css', 'theme-radar.css', 'lg-runtime.js', 'lg-app.js', 'lg-visuals.js', 'lg-brain.js', 'theme-glass.css', 'vendor/3d-force-graph.min.js', 'brain-seed.json', 'lg-store.js', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'])
   if (!existsSync('dist/' + f)) throw new Error('missing dist/' + f);
 console.log('built dist/ version', v);

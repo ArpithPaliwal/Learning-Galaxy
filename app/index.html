@@ -16,6 +16,8 @@
 <script src="lg-runtime.js"></script>
 <script src="lg-app.js" defer></script>
 <script src="lg-visuals.js" defer></script>
+<script src="vendor/3d-force-graph.min.js" defer></script>
+<script src="lg-brain.js" defer></script>
 </head><body>
 <!-- Netlify injects a "Powered by Netlify" badge script on free sites; it skips itself when these ids exist. -->
 <div id="nl-hud-frame" hidden></div><div id="nl-badge-frame" hidden></div>
@@ -696,6 +698,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
 
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="theme-radar.css">
+<link rel="stylesheet" href="theme-glass.css">
 <canvas id="bgfx" aria-hidden="true"></canvas><div class="fx" aria-hidden="true"></div>
 <div class="shell" id="shell">
   <div class="work">
@@ -703,7 +706,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
       <div class="brand"><span class="rx" aria-hidden="true"></span><span>Learning Galaxy</span></div>
       <nav class="tabs" id="tabs" aria-label="Sections">
         <button data-tab="today" class="on">Today</button>
-        <button data-tab="galaxy">Skill Map</button>
+        <button data-tab="galaxy">Brain</button>
         <button data-tab="radar">Radar</button>
         <button data-tab="courses">Courses</button>
         <button data-tab="library">Library</button>
@@ -735,6 +738,7 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
             </div>
           </div>
           <div class="stack">
+            <div class="card" id="tHV"></div>
             <div class="card">
               <div class="sec-h"><h3>Review</h3></div>
               <div class="row" style="justify-content:space-between"><div><span class="bignum" id="dueN">0</span> <span class="muted">cards due</span></div><button class="btn small" id="reviewBtn">Start review</button></div>
@@ -754,14 +758,15 @@ details.acc{border-radius:16px;border-color:rgb(var(--c-acc) / .14);background:r
 
       <!-- SKILL MAP -->
       <section class="view" id="v-galaxy" hidden>
-        <div class="sm-head"><div><div class="label">Skill map</div><h2 class="sm-h">Your learning, at a glance</h2></div><input class="inp" id="smFind" type="search" placeholder="Find a topic…" autocomplete="off" style="max-width:260px"></div>
+        <div id="brainHost"></div>
+        <div class="sm-head" id="smHead"><div><div class="label">Skill map</div><h2 class="sm-h">Your learning, at a glance</h2></div><input class="inp" id="smFind" type="search" placeholder="Find a topic…" autocomplete="off" style="max-width:260px"></div>
         <div class="sm-subjects" id="smSubjects"></div>
         <div class="card sm-brief" id="smBrief"></div>
-        <div class="row sm-bar"><div class="sm-views" id="smViews"><button data-v="map">◉ Overview</button><button data-v="lanes">☰ Lanes</button></div>
+        <div class="row sm-bar" id="smViewsRow"><div class="sm-views" id="smViews"><button data-v="map">◉ Overview</button><button data-v="lanes">☰ Lanes</button></div>
           <span class="faint" style="font-size:12.5px">◎ topic · ▶ course · ☰ path · ∆ academy · ⌕ research · ☐ task</span>
           <button class="btn small ghost" id="smSuggT" title="Include AI-suggested topics in the bucket">+ AI suggestions</button></div>
-        <div class="sm-wrap"><div style="min-width:0"><div id="smMapWrap"><div class="mp" id="smMap"></div></div><div class="sm-lanes" id="smLanes"></div></div><aside class="card sm-panel" id="smPanel" hidden></aside></div>
-        <p class="faint" style="font-size:12.5px;margin-top:10px">Overview: what you are learning, what is waiting in your bucket, and what you have mastered. Lanes: move topics between stages (drag on a computer).</p>
+        <div class="sm-wrap" id="smWrapRow"><div style="min-width:0"><div id="smMapWrap"><div class="mp" id="smMap"></div></div><div class="sm-lanes" id="smLanes"></div></div><aside class="card sm-panel" id="smPanel" hidden></aside></div>
+        <p class="faint" id="smFoot" style="font-size:12.5px;margin-top:10px">Overview: what you are learning, what is waiting in your bucket, and what you have mastered. Lanes: move topics between stages (drag on a computer).</p>
       </section>
 
       <!-- RADAR -->
@@ -1261,7 +1266,7 @@ renderers.push(function library_(){
     $$('#libBody [data-tdel]').forEach(x => x.onclick = () => del('tasks', x.dataset.tdel));
   }
 });
-function openTopic(id){ const t = C('topics').get(id); if (!t) return;
+function openTopic(id){ if (window.LGBrain && window.LGBrain.open) return window.LGBrain.open(id); const t = C('topics').get(id); if (!t) return;
   openModal(`<div class="row" style="justify-content:space-between"><span class="pill" style="--c:${STATUS[t.status]?.[1]}">${esc(STATUS[t.status]?.[0] || t.status)}</span><span class="label">${esc(catOf(t.cat).name)}</span></div>
     <h3>${esc(t.title)}</h3>${t.why ? `<p class="faint" style="font-size:13.5px">${esc(t.why)}</p>` : ''}
     ${t.explain ? `<div class="md">${md(t.explain)}</div>` : `<p class="muted" style="font-size:14px">No explanation saved yet.</p>`}
@@ -2270,6 +2275,8 @@ document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.ke
 
 /* ============ boot ============ */
 window.LGApp = { openTopic: (id) => openTopic(id), setTab: (t) => setTab(t) };
+// the Brain (lg-brain.js, deferred) reaches the app only through this object
+window.LGCore = { S, C, SM, put, patch, del, render, renderers, toast, md, esc, slug, rid, today, addDays, nowIso, LS, safeUrl, catOf, subjColor, openModal, closeModal, confirmBox, recordDone, teachBack, startBattle, focusPicker, createCourse, openJarvis, jarvisAsk, fireBot, setTab, aiName };
 setTab(['today','galaxy','radar','courses','library'].includes(S.tab) ? S.tab : 'today');
 connect().then(() => { wireDict(); render(); });
 setInterval(() => { if (S.day < today() && S.tab === 'today') { S.day = today(); } render(); }, 60000);

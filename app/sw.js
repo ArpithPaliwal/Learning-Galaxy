@@ -1,7 +1,7 @@
 // Stale-while-revalidate for the app shell: serve the cached copy instantly, refresh it in the background.
 // A new deploy shows as a "new version is ready" banner. The build stamps CACHE with the commit, which purges old entries.
 const CACHE = 'lg-__VERSION__';
-const SHELL = ['/', '/index.html', '/theme.css', '/theme-radar.css', '/config.js', '/lg-store.js', '/lg-runtime.js', '/lg-app.js', '/lg-visuals.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
+const SHELL = ['/', '/index.html', '/theme.css', '/theme-radar.css', '/config.js', '/lg-store.js', '/lg-runtime.js', '/lg-app.js', '/lg-visuals.js', '/lg-brain.js', '/theme-glass.css', '/vendor/3d-force-graph.min.js', '/brain-seed.json', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -53,6 +53,10 @@ if (!(html.indexOf('rel="manifest"') > 0 && html.indexOf('rel="manifest"') < htm
 // Jarvis reply style (length + tone) must reach the prompt and be changeable by Jarvis itself
 { const ok2 = html.includes('${styleLine()}') && html.includes("case 'reply_style'") && html.includes('id="jStyle"'); if (!ok2) fail('Jarvis reply style: styleLine() in the prompt, the reply_style action and the Aa button are all required'); else ok('Jarvis reply style is wired'); }
 
+// the Brain: 3D graph + Kanban + editor must stay wired to the app
+{ const ok3 = html.includes('src="lg-brain.js"') && html.includes('window.LGCore = {') && html.includes('id="brainHost"') && html.includes('id="tHV"') && html.includes('window.LGBrain.open(id)');
+  const seedOk = (() => { try { const d = JSON.parse(readFileSync('app/brain-seed.json', 'utf8')); const ids = new Set(Object.keys(d.topics)); const bad = Object.values(d.topics).flatMap(t => [...(t.prereqs||[]), ...(t.related||[])]).filter(x => !ids.has(x)); return Object.keys(d.categories).length > 5 && ids.size > 50 && !bad.length && [...ids].every(i => /^[A-Za-z0-9_.~:@+-]{1,200}$/.test(i)); } catch (e) { return false; } })();
+  if (!ok3) fail('Brain: lg-brain.js, window.LGCore, #brainHost, #tHV and openTopic → LGBrain must be wired'); else if (!seedOk) fail('brain-seed.json invalid (ids, links or size)'); else ok('Brain is wired and the curriculum seed is valid'); }
 { const fe = validateFeed(JSON.parse(readFileSync('app/feed/latest.json', 'utf8'))); if (fe.length) fail('feed: ' + fe.join('; ')); else ok('daily feed is valid'); }
 
 if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }
